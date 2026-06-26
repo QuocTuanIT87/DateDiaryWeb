@@ -17,7 +17,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       setIsLoading(true);
       await AsyncStorageService.runFirebaseMigrationIfNeeded();
-      await AsyncStorageService.encryptFirebaseDataIfNeeded();
       const userList = await AsyncStorageService.getUsers();
       setUsers(userList);
     } catch (error) {
