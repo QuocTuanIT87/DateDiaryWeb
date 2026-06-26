@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
-import { AsyncStorageService, type DateStartTime } from "../services/AsyncStorageService";
+import {
+  AsyncStorageService,
+  type DateStartTime,
+} from "../services/AsyncStorageService";
 import { GoogleDriveService } from "../services/GoogleDriveService";
-import { getDurationSince, formatDateOnly, formatDateTime, type DurationDetails } from "../utils/dateUtils";
+import {
+  getDurationSince,
+  formatDateOnly,
+  formatDateTime,
+  type DurationDetails,
+} from "../utils/dateUtils";
 import { LazyImage } from "../components/LazyImage";
 import { CustomAlert } from "../components/CustomAlert";
-import { 
-  IoHeart, 
-  IoCalendarOutline, 
-  IoCallOutline, 
-  IoLogoFacebook, 
+import {
+  IoHeart,
+  IoCalendarOutline,
+  IoCallOutline,
+  IoLogoFacebook,
   IoCreateOutline,
   IoGiftOutline,
-  IoBodyOutline
+  IoBodyOutline,
 } from "react-icons/io5";
 
 interface ProfileViewProps {
@@ -22,7 +30,12 @@ interface ProfileViewProps {
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
   const { users, refreshState } = useApp();
   const [milestones, setMilestones] = useState<DateStartTime | null>(null);
-  const [duration, setDuration] = useState<DurationDetails>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [duration, setDuration] = useState<DurationDetails>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [activeGender, setActiveGender] = useState<"Nam" | "Nữ" | null>(null);
 
@@ -32,7 +45,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
     try {
       const startTime = AsyncStorageService.getStartTime();
       setMilestones(startTime);
-      
+
       // Calculate initial duration
       if (startTime && startTime.confessionDay) {
         setDuration(getDurationSince(startTime.confessionDay));
@@ -62,7 +75,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
     if (!connected) {
       CustomAlert.alert(
         "Chưa kết nối Google",
-        "Ảnh hồ sơ cần được lưu trên Google Drive. Vui lòng kết nối tài khoản Google trong phần Cài đặt trước."
+        "Ảnh hồ sơ cần được lưu trên Google Drive. Vui lòng kết nối tài khoản Google trong phần Cài đặt trước.",
       );
       return;
     }
@@ -81,7 +94,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
       try {
         setUpdatingAvatar(true);
         // Upload new avatar to Google Drive
-        const driveUrl = await GoogleDriveService.uploadAvatar(localUri, gender);
+        const driveUrl = await GoogleDriveService.uploadAvatar(
+          localUri,
+          gender,
+        );
 
         // Update database
         const userList = await AsyncStorageService.getUsers();
@@ -103,7 +119,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
         CustomAlert.success("Thành công", "Đã cập nhật ảnh đại diện của bạn.");
       } catch (error: any) {
         console.error("Update avatar error:", error);
-        CustomAlert.alert("Lỗi", error.message || "Không thể cập nhật ảnh đại diện.");
+        CustomAlert.alert(
+          "Lỗi",
+          error.message || "Không thể cập nhật ảnh đại diện.",
+        );
       } finally {
         setUpdatingAvatar(false);
         // Clear input value so same file can trigger change again
@@ -116,15 +135,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
   const girlUser = users.find((u) => u.gender === "Nữ");
 
   // Default avatars if not set
-  const defaultBoyAvatar = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150";
-  const defaultGirlAvatar = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150";
+  const defaultBoyAvatar =
+    "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150";
+  const defaultGirlAvatar =
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150";
 
   return (
-    <div className="container animate-fade" style={{ paddingBottom: "40px", flex: 1 }}>
+    <div
+      className="container animate-fade"
+      style={{ paddingBottom: "40px", flex: 1 }}
+    >
       {/* Input hidden file */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
+      <input
+        type="file"
+        ref={fileInputRef}
         onChange={handleFileChange}
         accept="image/*"
         style={{ display: "none" }}
@@ -132,16 +156,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
 
       {/* Header */}
       <div style={{ marginBottom: "20px" }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "20px", color: "var(--text)" }}>
+        <h2
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: "20px",
+            color: "var(--text)",
+          }}
+        >
           Hồ sơ của Chúng ta 💕
         </h2>
-        <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--text-muted)",
+            marginTop: "2px",
+          }}
+        >
           Nơi lưu giữ thông tin chi tiết và đồng hồ tình yêu
         </p>
       </div>
 
       {/* Ticking Anniversary Clock */}
-      <div 
+      <div
         style={{
           background: "linear-gradient(135deg, #f78fb3 0%, #f368e0 100%)",
           borderRadius: "var(--radius-lg)",
@@ -154,11 +191,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
           marginBottom: "24px",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center"
+          alignItems: "center",
         }}
       >
         {/* Pulsing overlay heart */}
-        <div 
+        <div
           className="animate-heartbeat"
           style={{
             position: "absolute",
@@ -167,35 +204,60 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
             top: "calc(50% - 70px)",
             left: "calc(50% - 70px)",
             zIndex: 1,
-            pointerEvents: "none"
+            pointerEvents: "none",
           }}
         >
           <IoHeart />
         </div>
 
         <div style={{ zIndex: 2 }}>
-          <h4 style={{ fontSize: "13px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "1px", opacity: 0.9 }}>
+          <h4
+            style={{
+              fontSize: "13px",
+              fontWeight: 500,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              opacity: 0.9,
+            }}
+          >
             Thời gian bên nhau
           </h4>
-          
+
           {/* Days Counter */}
-          <div style={{ margin: "14px 0", display: "flex", alignItems: "baseline", justifyContent: "center" }}>
-            <span style={{ fontSize: "48px", fontWeight: 800, fontFamily: "var(--font-display)" }}>
+          <div
+            style={{
+              margin: "14px 0",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "48px",
+                fontWeight: 800,
+                fontFamily: "var(--font-display)",
+              }}
+            >
               {duration.days}
             </span>
-            <span style={{ fontSize: "18px", fontWeight: 600, marginLeft: "4px" }}>ngày</span>
+            <span
+              style={{ fontSize: "18px", fontWeight: 600, marginLeft: "4px" }}
+            >
+              ngày
+            </span>
           </div>
 
           {/* Clock timer hours, minutes, seconds */}
-          <div 
-            style={{ 
-              display: "flex", 
-              gap: "12px", 
-              fontSize: "14px", 
-              fontWeight: 500, 
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              fontSize: "14px",
+              fontWeight: 500,
               backgroundColor: "rgba(255,255,255,0.15)",
               padding: "6px 16px",
-              borderRadius: "var(--radius-full)"
+              borderRadius: "var(--radius-full)",
             }}
           >
             <span>{String(duration.hours).padStart(2, "0")} Giờ</span>
@@ -207,27 +269,51 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
 
           {/* Date Milestones Details */}
           {milestones && (
-            <div 
-              style={{ 
-                marginTop: "16px", 
-                fontSize: "11px", 
-                opacity: 0.8, 
-                display: "flex", 
-                flexDirection: "column", 
-                gap: "4px" 
+            <div
+              style={{
+                marginTop: "16px",
+                fontSize: "11px",
+                opacity: 0.8,
+                display: "flex",
+                flexDirection: "column",
+                gap: "4px",
               }}
             >
-              <div>🗓️ Ngày tỏ tình: {formatDateTime(milestones.confessionDay)}</div>
-              <div>🤝 Ngày quen nhau: {formatDateTime(milestones.acquaintedDay)}</div>
+              <div>
+                🗓️ Ngày tỏ tình: {formatDateTime(milestones.confessionDay)}
+              </div>
+              <div>
+                🤝 Ngày quen nhau: {formatDateTime(milestones.acquaintedDay)}
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {updatingAvatar && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", padding: "10px", marginBottom: "10px", color: "var(--accent)" }}>
-          <div className="spinner" style={{ width: "20px", height: "20px", borderWidth: "2px", borderLeftColor: "var(--accent)" }}></div>
-          <span style={{ fontSize: "13px", fontWeight: 500 }}>Đang cập nhật ảnh hồ sơ...</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            padding: "10px",
+            marginBottom: "10px",
+            color: "var(--accent)",
+          }}
+        >
+          <div
+            className="spinner"
+            style={{
+              width: "20px",
+              height: "20px",
+              borderWidth: "2px",
+              borderLeftColor: "var(--accent)",
+            }}
+          ></div>
+          <span style={{ fontSize: "13px", fontWeight: 500 }}>
+            Đang cập nhật ảnh hồ sơ...
+          </span>
         </div>
       )}
 
@@ -236,11 +322,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
         {[boyUser, girlUser].map((user) => {
           if (!user) return null;
           const isBoy = user.gender === "Nam";
-          const themeColor = isBoy ? "var(--primary)" : "var(--accent)";
+          const themeColor = isBoy ? "var(--accent)" : "var(--primary)";
           const fallbackAvatar = isBoy ? defaultBoyAvatar : defaultGirlAvatar;
 
           return (
-            <div 
+            <div
               key={user.id}
               style={{
                 backgroundColor: "var(--surface)",
@@ -251,13 +337,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
                 position: "relative",
                 display: "flex",
                 flexDirection: "column",
-                gap: "16px"
+                gap: "16px",
               }}
             >
               {/* Header profile info */}
-              <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "16px", alignItems: "center" }}
+              >
                 {/* Avatar Box with click to edit */}
-                <div 
+                <div
                   onClick={() => handleAvatarClick(user.gender)}
                   style={{
                     position: "relative",
@@ -266,22 +354,54 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
                     borderRadius: "50%",
                     cursor: "pointer",
                     overflow: "hidden",
-                    border: `2px solid ${themeColor}`
+                    border: `2px solid ${themeColor}`,
                   }}
                 >
-                  <LazyImage 
-                    src={GoogleDriveService.resolveDriveUrl(user.avatar) || fallbackAvatar} 
-                    alt={user.name} 
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  <LazyImage
+                    src={
+                      GoogleDriveService.resolveDriveUrl(user.avatar) ||
+                      fallbackAvatar
+                    }
+                    alt={user.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
                   />
                 </div>
 
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <h3 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text)" }}>{user.name}</h3>
-                    <span style={{ fontSize: "13px" }}>{isBoy ? "♂️" : "♀️"}</span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 700,
+                        color: "var(--text)",
+                      }}
+                    >
+                      {user.name}
+                    </h3>
+                    <span style={{ fontSize: "13px" }}>
+                      {isBoy ? "♂️" : "♀️"}
+                    </span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      fontSize: "12px",
+                      color: "var(--text-muted)",
+                      marginTop: "2px",
+                    }}
+                  >
                     <IoCalendarOutline size={13} />
                     <span>Sinh nhật: {formatDateOnly(user.birthday)}</span>
                   </div>
@@ -299,7 +419,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
                     display: "flex",
                     alignItems: "center",
                     gap: "4px",
-                    fontSize: "12px"
+                    fontSize: "12px",
                   }}
                 >
                   <IoCreateOutline size={14} />
@@ -308,7 +428,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
               </div>
 
               {/* Physical Details */}
-              <div 
+              <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
@@ -316,36 +436,62 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
                   backgroundColor: "var(--background)",
                   padding: "12px",
                   borderRadius: "var(--radius-md)",
-                  fontSize: "12px"
+                  fontSize: "12px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
                   <IoBodyOutline size={15} color={themeColor} />
-                  <span><strong>Cơ thể:</strong> {user.height}cm / {user.weight}kg</span>
+                  <span>
+                    <strong>Cơ thể:</strong> {user.height}cm / {user.weight}kg
+                  </span>
                 </div>
-                
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
                   <IoGiftOutline size={15} color={themeColor} />
                   <span>
-                    <strong>Size:</strong> Giày {user.shoeSize || "?"} / Áo {user.shirtSize || "?"}
+                    <strong>Size:</strong> Giày {user.shoeSize || "?"} / Áo{" "}
+                    {user.shirtSize || "?"}
                   </span>
                 </div>
 
                 {user.phone && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", gridColumn: "span 2" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      gridColumn: "span 2",
+                    }}
+                  >
                     <IoCallOutline size={14} color={themeColor} />
-                    <span><strong>SĐT:</strong> {user.phone}</span>
+                    <span>
+                      <strong>SĐT:</strong> {user.phone}
+                    </span>
                   </div>
                 )}
 
                 {user.facebook && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", gridColumn: "span 2" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      gridColumn: "span 2",
+                    }}
+                  >
                     <IoLogoFacebook size={14} color="#1877f2" />
-                    <a 
-                      href={user.facebook} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      style={{ color: "var(--primary-dark)", textDecoration: "none" }}
+                    <a
+                      href={user.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "var(--primary-dark)",
+                        textDecoration: "none",
+                      }}
                     >
                       Kết nối Facebook
                     </a>
@@ -354,48 +500,121 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
               </div>
 
               {/* Arrays hobbies lists */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  fontSize: "13px",
+                }}
+              >
                 <div>
-                  <strong style={{ color: "var(--success)" }}>🟢 Sở thích:</strong>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  <strong style={{ color: "var(--success)" }}>
+                    🟢 Sở thích:
+                  </strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "4px",
+                      marginTop: "4px",
+                    }}
+                  >
                     {user.interest && user.interest.length > 0 ? (
                       user.interest.map((h, i) => (
-                        <span key={i} style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", padding: "2px 8px", borderRadius: "4px", fontSize: "11px" }}>
+                        <span
+                          key={i}
+                          style={{
+                            backgroundColor: "#e8f5e9",
+                            color: "#2e7d32",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                          }}
+                        >
                           {h}
                         </span>
                       ))
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Chưa cập nhật</span>
+                      <span
+                        style={{ fontSize: "12px", color: "var(--text-muted)" }}
+                      >
+                        Chưa cập nhật
+                      </span>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <strong style={{ color: "var(--warning)" }}>🟡 Không thích:</strong>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  <strong style={{ color: "var(--warning)" }}>
+                    🟡 Không thích:
+                  </strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "4px",
+                      marginTop: "4px",
+                    }}
+                  >
                     {user.dislike && user.dislike.length > 0 ? (
                       user.dislike.map((d, i) => (
-                        <span key={i} style={{ backgroundColor: "#fff8e1", color: "#b78103", padding: "2px 8px", borderRadius: "4px", fontSize: "11px" }}>
+                        <span
+                          key={i}
+                          style={{
+                            backgroundColor: "#fff8e1",
+                            color: "#b78103",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                          }}
+                        >
                           {d}
                         </span>
                       ))
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Chưa cập nhật</span>
+                      <span
+                        style={{ fontSize: "12px", color: "var(--text-muted)" }}
+                      >
+                        Chưa cập nhật
+                      </span>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <strong style={{ color: "var(--danger)" }}>🔴 Cực kỳ ghét:</strong>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "4px" }}>
+                  <strong style={{ color: "var(--danger)" }}>
+                    🔴 Cực kỳ ghét:
+                  </strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "4px",
+                      marginTop: "4px",
+                    }}
+                  >
                     {user.hate && user.hate.length > 0 ? (
                       user.hate.map((ht, i) => (
-                        <span key={i} style={{ backgroundColor: "#ffebee", color: "#c62828", padding: "2px 8px", borderRadius: "4px", fontSize: "11px" }}>
+                        <span
+                          key={i}
+                          style={{
+                            backgroundColor: "#ffebee",
+                            color: "#c62828",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                          }}
+                        >
                           {ht}
                         </span>
                       ))
                     ) : (
-                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Chưa cập nhật</span>
+                      <span
+                        style={{ fontSize: "12px", color: "var(--text-muted)" }}
+                      >
+                        Chưa cập nhật
+                      </span>
                     )}
                   </div>
                 </div>
