@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AsyncStorageService, type DateHistory, type DateType } from "../services/AsyncStorageService";
 import { GoogleDriveService } from "../services/GoogleDriveService";
 import { formatDateTime } from "../utils/dateUtils";
@@ -12,8 +13,10 @@ import {
   IoChevronBackOutline,
   IoChevronForwardOutline,
   IoTrashOutline,
-  IoCreateOutline
+  IoCreateOutline,
+  IoRefreshOutline
 } from "react-icons/io5";
+import { MdZoomIn, MdZoomOut } from "react-icons/md";
 
 export const AddEventView: React.FC = () => {
   const [history, setHistory] = useState<DateHistory[]>([]);
@@ -41,6 +44,11 @@ export const AddEventView: React.FC = () => {
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerIndex, setViewerIndex] = useState<number>(0);
   const [showViewer, setShowViewer] = useState<boolean>(false);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [rotateDegree, setRotateDegree] = useState<number>(0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Reference for file input
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +97,33 @@ export const AddEventView: React.FC = () => {
     const newLimit = displayLimit + 20;
     setDisplayLimit(newLimit);
     setHistory(allHistory.slice(0, newLimit));
+  };
+
+  // Image Drag / Pan Handlers
+  const handleDragStart = (clientX: number, clientY: number) => {
+    if (zoomScale <= 1) return;
+    setIsDragging(true);
+    setDragStart({ x: clientX - panOffset.x, y: clientY - panOffset.y });
+  };
+
+  const handleDragMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    setPanOffset({
+      x: clientX - dragStart.x,
+      y: clientY - dragStart.y
+    });
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  const handleCloseViewer = () => {
+    setShowViewer(false);
+    setZoomScale(1);
+    setRotateDegree(0);
+    setPanOffset({ x: 0, y: 0 });
+    setIsDragging(false);
   };
 
   // Image Selection
@@ -332,8 +367,9 @@ export const AddEventView: React.FC = () => {
         </div>
       )}
 
-      {/* Main Title Header */}
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ maxWidth: "800px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* Main Title Header */}
+        <div style={{ marginBottom: "20px" }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "20px", color: "var(--text)" }}>
           Nhật ký khoảnh khắc 📖
         </h2>
@@ -435,15 +471,14 @@ export const AddEventView: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Horizontal Scrollable Images */}
+                  {/* Wrapping Images List */}
                   {item.imageList && item.imageList.length > 0 && (
                     <div 
                       style={{
                         display: "flex",
+                        flexWrap: "wrap",
                         gap: "8px",
-                        overflowX: "auto",
-                        paddingBottom: "4px",
-                        scrollbarWidth: "none"
+                        paddingBottom: "4px"
                       }}
                     >
                       {item.imageList.map((imgUri, index) => (
@@ -452,8 +487,18 @@ export const AddEventView: React.FC = () => {
                           src={GoogleDriveService.resolveDriveUrl(imgUri)}
                           alt="Kỷ niệm"
                           onClick={() => {
-                            setViewerImages(item.imageList);
-                            setViewerIndex(index);
+                            const flatImages = history.reduce<string[]>((acc, hItem) => {
+                              if (hItem.imageList && hItem.imageList.length > 0) {
+                                acc.push(...hItem.imageList);
+                              }
+                              return acc;
+                            }, []);
+                            const globalIndex = flatImages.indexOf(imgUri);
+                            setViewerImages(flatImages);
+                            setViewerIndex(globalIndex >= 0 ? globalIndex : 0);
+                            setZoomScale(1);
+                            setRotateDegree(0);
+                            setPanOffset({ x: 0, y: 0 });
                             setShowViewer(true);
                           }}
                           style={{
@@ -498,6 +543,7 @@ export const AddEventView: React.FC = () => {
           )}
         </>
       )}
+      </div>
 
       {/* FAB button */}
       <button
@@ -540,7 +586,7 @@ export const AddEventView: React.FC = () => {
       `}</style>
 
       {/* Overlay modal Form */}
-      {showForm && (
+      {showForm && createPortal(
         <div 
           style={{
             position: "fixed",
@@ -550,26 +596,26 @@ export const AddEventView: React.FC = () => {
             bottom: 0,
             backgroundColor: "rgba(15, 23, 42, 0.5)",
             backdropFilter: "blur(4px)",
-            zIndex: 950,
+            zIndex: 9999,
             display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center"
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
           }}
           onClick={handleCancelForm}
         >
           <div 
             style={{
               width: "100%",
-              maxWidth: "480px",
+              maxWidth: "900px",
               backgroundColor: "var(--surface)",
-              borderTopLeftRadius: "var(--radius-lg)",
-              borderTopRightRadius: "var(--radius-lg)",
+              borderRadius: "var(--radius-lg)",
               padding: "24px",
               display: "flex",
               flexDirection: "column",
               gap: "16px",
-              boxShadow: "0 -10px 25px -5px rgba(0, 0, 0, 0.1)",
-              maxHeight: "85vh",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              maxHeight: "90vh",
               overflowY: "auto",
               animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
             }}
@@ -585,83 +631,92 @@ export const AddEventView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveEvent} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              
-              {/* Date selection picker */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Ngày và Giờ diễn ra *</label>
-                <input 
-                  type="datetime-local"
-                  value={datetime}
-                  onChange={(e) => setDatetime(e.target.value)}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border)",
-                    fontSize: "14px",
-                    color: "var(--text)"
-                  }}
-                />
+              <div className="form-grid">
+                {/* Column 1 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Date selection picker */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Ngày và Giờ diễn ra *</label>
+                    <input 
+                      type="datetime-local"
+                      value={datetime}
+                      onChange={(e) => setDatetime(e.target.value)}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border)",
+                        fontSize: "14px",
+                        color: "var(--text)"
+                      }}
+                    />
+                  </div>
+
+                  {/* Dating Category selection */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Loại hoạt động hẹn hò *</label>
+                    <select
+                      value={selectedType}
+                      onChange={(e) => setSelectedType(e.target.value)}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border)",
+                        fontSize: "14px",
+                        backgroundColor: "var(--surface)",
+                        color: "var(--text)"
+                      }}
+                    >
+                      {types.map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Occasion / Reason */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Dịp / Lý do diễn ra (VD: Kỉ niệm 100 ngày...)</label>
+                    <input 
+                      type="text"
+                      placeholder="Không bắt buộc"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border)",
+                        fontSize: "14px"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Column 2 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Notes */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Ghi chú khoảnh khắc ngọt ngào *</label>
+                    <textarea
+                      placeholder="Ghi nhận những điều đáng nhớ nhất..."
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--border)",
+                        fontSize: "14px",
+                        resize: "none",
+                        lineHeight: 1.4,
+                        flex: 1,
+                        minHeight: "120px"
+                      }}
+                    />
+                  </div>
+
+                </div>
               </div>
 
-              {/* Dating Category selection */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Loại hoạt động hẹn hò *</label>
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border)",
-                    fontSize: "14px",
-                    backgroundColor: "var(--surface)",
-                    color: "var(--text)"
-                  }}
-                >
-                  {types.map(t => (
-                    <option key={t.id} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Occasion / Reason */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Dịp / Lý do diễn ra (VD: Kỉ niệm 100 ngày...)</label>
-                <input 
-                  type="text"
-                  placeholder="Không bắt buộc"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border)",
-                    fontSize: "14px"
-                  }}
-                />
-              </div>
-
-              {/* Notes */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Ghi chú khoảnh khắc ngọt ngào *</label>
-                <textarea
-                  placeholder="Ghi nhận những điều đáng nhớ nhất..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={4}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border)",
-                    fontSize: "14px",
-                    resize: "none",
-                    lineHeight: 1.4
-                  }}
-                />
-              </div>
-
-              {/* Images uploads */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {/* Images uploads (full width on a new line) */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
                 <label style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)" }}>Hình ảnh kỉ niệm</label>
                 <input 
                   type="file" 
@@ -672,62 +727,84 @@ export const AddEventView: React.FC = () => {
                   style={{ display: "none" }}
                 />
 
-                <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", scrollbarWidth: "none" }}>
-                  {/* Select Trigger Box */}
+                {/* Select Trigger Box */}
+                <div 
+                  onClick={handleTriggerFileInput}
+                  style={{
+                    width: "100%",
+                    height: "48px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px dashed var(--border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    backgroundColor: "rgba(85, 150, 224, 0.05)",
+                    transition: "all var(--transition-fast)"
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.borderColor = "var(--primary)";
+                    e.currentTarget.style.backgroundColor = "rgba(85, 150, 224, 0.08)";
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.backgroundColor = "rgba(85, 150, 224, 0.05)";
+                  }}
+                >
+                  <IoAddOutline size={20} color="var(--primary)" />
+                  <span style={{ fontSize: "13px", fontWeight: 500 }}>Thêm ảnh kỷ niệm</span>
+                </div>
+
+                {/* Previews Horizontal Row */}
+                {imageList.length > 0 && (
                   <div 
-                    onClick={handleTriggerFileInput}
-                    style={{
-                      width: "80px",
-                      height: "80px",
-                      borderRadius: "var(--radius-md)",
-                      border: "2px dashed var(--border)",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      flexShrink: 0
+                    style={{ 
+                      display: "flex", 
+                      gap: "10px", 
+                      overflowX: "auto", 
+                      paddingBottom: "8px",
+                      paddingTop: "4px",
+                      scrollbarWidth: "thin",
+                      marginTop: "4px"
                     }}
                   >
-                    <IoAddOutline size={24} />
-                    <span style={{ fontSize: "10px", marginTop: "2px" }}>Thêm ảnh</span>
-                  </div>
-
-                  {/* Previews */}
-                  {imageList.map((url, idx) => (
-                    <div 
-                      key={idx} 
-                      style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}
-                    >
-                      <img 
-                        src={url} 
-                        alt="Preview" 
-                        style={{ width: "100%", height: "100%", borderRadius: "var(--radius-md)", objectFit: "cover" }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(idx)}
-                        style={{
-                          position: "absolute",
-                          top: "-6px",
-                          right: "-6px",
-                          width: "20px",
-                          height: "20px",
-                          borderRadius: "50%",
-                          backgroundColor: "rgba(15, 23, 42, 0.6)",
-                          color: "#ffffff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: 0
-                        }}
+                    {imageList.map((url, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}
                       >
-                        <IoCloseOutline size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <img 
+                          src={url} 
+                          alt="Preview" 
+                          style={{ width: "100%", height: "100%", borderRadius: "var(--radius-md)", objectFit: "cover" }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          style={{
+                            position: "absolute",
+                            top: "-6px",
+                            right: "-6px",
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            backgroundColor: "rgba(15, 23, 42, 0.6)",
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 0,
+                            border: "1px solid rgba(255, 255, 255, 0.3)"
+                          }}
+                        >
+                          <IoCloseOutline size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Submit Buttons */}
@@ -765,11 +842,27 @@ export const AddEventView: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+          
+          <style>{`
+            .form-grid {
+              display: grid;
+              grid-template-columns: 1fr;
+              gap: 16px;
+              width: 100%;
+            }
+            @media (min-width: 769px) {
+              .form-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+              }
+            }
+          `}</style>
+        </div>,
+        document.body
       )}
 
       {/* 3-dots Menu Popover Sheet */}
-      {menuEvent && (
+      {menuEvent && createPortal(
         <div 
           style={{
             position: "fixed",
@@ -777,33 +870,33 @@ export const AddEventView: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.3)",
-            zIndex: 960,
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            zIndex: 9999,
             display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center"
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px"
           }}
           onClick={() => setMenuEvent(null)}
         >
           <div 
             style={{
               width: "100%",
-              maxWidth: "480px",
+              maxWidth: "400px",
               backgroundColor: "var(--surface)",
-              borderTopLeftRadius: "var(--radius-lg)",
-              borderTopRightRadius: "var(--radius-lg)",
-              padding: "20px 24px 32px 24px",
+              borderRadius: "var(--radius-lg)",
+              padding: "24px",
               display: "flex",
               flexDirection: "column",
               gap: "6px",
-              boxShadow: "0 -10px 25px -5px rgba(0, 0, 0, 0.1)",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
               animation: "slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ width: "40px", height: "4px", backgroundColor: "var(--border)", borderRadius: "2px", alignSelf: "center", marginBottom: "16px" }}></div>
-            
-            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "12px", fontFamily: "var(--font-display)" }}>
+            <h4 style={{ fontSize: "16px", fontWeight: 700, color: "var(--text)", marginBottom: "16px", fontFamily: "var(--font-display)", textAlign: "center" }}>
               Tùy chọn khoảnh khắc
             </h4>
 
@@ -814,7 +907,7 @@ export const AddEventView: React.FC = () => {
                 alignItems: "center",
                 gap: "12px",
                 width: "100%",
-                padding: "16px 12px",
+                padding: "14px 12px",
                 fontSize: "15px",
                 color: "var(--text)",
                 borderBottom: "1px solid var(--border)",
@@ -832,7 +925,7 @@ export const AddEventView: React.FC = () => {
                 alignItems: "center",
                 gap: "12px",
                 width: "100%",
-                padding: "16px 12px",
+                padding: "14px 12px",
                 fontSize: "15px",
                 color: "var(--danger)",
                 textAlign: "left"
@@ -842,11 +935,12 @@ export const AddEventView: React.FC = () => {
               <span>Xóa khoảnh khắc</span>
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Lightbox Image Zoom Viewer Modal */}
-      {showViewer && (
+      {showViewer && createPortal(
         <div 
           style={{
             position: "fixed",
@@ -854,14 +948,17 @@ export const AddEventView: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.95)",
-            zIndex: 990,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            zIndex: 9999,
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "20px 0"
+            padding: "20px 0",
+            animation: "fadeIn 0.2s ease-out"
           }}
-          onClick={() => setShowViewer(false)}
+          onClick={handleCloseViewer}
         >
           {/* Viewer Header */}
           <div 
@@ -869,23 +966,33 @@ export const AddEventView: React.FC = () => {
               display: "flex", 
               justifyContent: "space-between", 
               alignItems: "center", 
-              padding: "0 20px", 
+              padding: "0 24px", 
               color: "#ffffff",
               zIndex: 1000 
             }}
             onClick={e => e.stopPropagation()}
           >
-            <span style={{ fontSize: "14px", fontWeight: 500 }}>
+            <span style={{ fontSize: "14px", fontWeight: 600, fontFamily: "var(--font-display)" }}>
               Ảnh {viewerIndex + 1} / {viewerImages.length}
             </span>
             <button 
-              onClick={() => setShowViewer(false)}
+              onClick={handleCloseViewer}
               style={{
                 color: "#ffffff",
-                padding: "6px",
-                backgroundColor: "rgba(255,255,255,0.15)",
+                padding: "8px",
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
                 borderRadius: "50%",
-                display: "flex"
+                display: "flex",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
               <IoCloseOutline size={22} />
@@ -902,42 +1009,85 @@ export const AddEventView: React.FC = () => {
               justifyContent: "center",
               overflow: "hidden"
             }}
-            onClick={() => setShowViewer(false)}
+            onClick={handleCloseViewer}
           >
             {viewerImages.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setViewerIndex(prev => (prev === 0 ? viewerImages.length - 1 : prev - 1));
+                  setViewerIndex(prev => {
+                    setZoomScale(1);
+                    setRotateDegree(0);
+                    setPanOffset({ x: 0, y: 0 });
+                    setIsDragging(false);
+                    return prev === 0 ? viewerImages.length - 1 : prev - 1;
+                  });
                 }}
                 style={{
                   position: "absolute",
-                  left: "16px",
+                  left: "20px",
                   color: "#ffffff",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "50%",
-                  width: "40px",
-                  height: "40px",
+                  width: "44px",
+                  height: "44px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  zIndex: 1000
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  zIndex: 1000,
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                  e.currentTarget.style.transform = "scale(1.08)";
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 <IoChevronBackOutline size={22} />
               </button>
             )}
 
-            <LazyImage 
+            <img 
               src={GoogleDriveService.resolveDriveUrl(viewerImages[viewerIndex])} 
               alt="Zoomed" 
               onClick={e => e.stopPropagation()}
+              onMouseDown={e => {
+                e.preventDefault();
+                handleDragStart(e.clientX, e.clientY);
+              }}
+              onMouseMove={e => {
+                e.preventDefault();
+                handleDragMove(e.clientX, e.clientY);
+              }}
+              onMouseUp={handleDragEnd}
+              onMouseLeave={handleDragEnd}
+              onTouchStart={e => {
+                const touch = e.touches[0];
+                handleDragStart(touch.clientX, touch.clientY);
+              }}
+              onTouchMove={e => {
+                const touch = e.touches[0];
+                handleDragMove(touch.clientX, touch.clientY);
+              }}
+              onTouchEnd={handleDragEnd}
               style={{
-                maxWidth: "100%",
-                maxHeight: "80vh",
+                maxWidth: "90vw",
+                maxHeight: "70vh",
                 objectFit: "contain",
                 userSelect: "none",
-                transition: "transform 0.2s"
+                cursor: zoomScale > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotateDegree}deg)`,
+                transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
+                border: "2px solid rgba(255, 255, 255, 0.1)"
               }}
             />
 
@@ -945,20 +1095,39 @@ export const AddEventView: React.FC = () => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setViewerIndex(prev => (prev === viewerImages.length - 1 ? 0 : prev + 1));
+                  setViewerIndex(prev => {
+                    setZoomScale(1);
+                    setRotateDegree(0);
+                    setPanOffset({ x: 0, y: 0 });
+                    setIsDragging(false);
+                    return prev === viewerImages.length - 1 ? 0 : prev + 1;
+                  });
                 }}
                 style={{
                   position: "absolute",
-                  right: "16px",
+                  right: "20px",
                   color: "#ffffff",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "50%",
-                  width: "40px",
-                  height: "40px",
+                  width: "44px",
+                  height: "44px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  zIndex: 1000
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  zIndex: 1000,
+                  transition: "all 0.2s"
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                  e.currentTarget.style.transform = "scale(1.08)";
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
                 <IoChevronForwardOutline size={22} />
@@ -966,8 +1135,153 @@ export const AddEventView: React.FC = () => {
             )}
           </div>
 
-          <div style={{ height: "40px" }}></div>
-        </div>
+          {/* Action Controls Bar */}
+          <div 
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "16px",
+              zIndex: 1000,
+              paddingBottom: "10px"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Zoom Out Button */}
+            <button
+              onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
+              style={{
+                color: "#ffffff",
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                borderRadius: "50%",
+                width: "46px",
+                height: "46px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              title="Thu nhỏ"
+            >
+              <MdZoomOut size={22} />
+            </button>
+
+            {/* Reset Button */}
+            <button
+              onClick={() => {
+                setZoomScale(1);
+                setRotateDegree(0);
+                setPanOffset({ x: 0, y: 0 });
+                setIsDragging(false);
+              }}
+              style={{
+                color: "#ffffff",
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                borderRadius: "20px",
+                padding: "0 16px",
+                height: "38px",
+                fontSize: "12px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "4px",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                e.currentTarget.style.transform = "scale(1.04)";
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              title="Đặt lại thiết lập"
+            >
+              <span>{Math.round(zoomScale * 100)}%</span>
+              {rotateDegree !== 0 && <span> ({rotateDegree}°)</span>}
+            </button>
+
+            {/* Zoom In Button */}
+            <button
+              onClick={() => setZoomScale(prev => Math.min(3, prev + 0.25))}
+              style={{
+                color: "#ffffff",
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                borderRadius: "50%",
+                width: "46px",
+                height: "46px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              title="Phóng to"
+            >
+              <MdZoomIn size={22} />
+            </button>
+
+            {/* Rotate Button */}
+            <button
+              onClick={() => setRotateDegree(prev => (prev + 90) % 360)}
+              style={{
+                color: "#ffffff",
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                borderRadius: "50%",
+                width: "46px",
+                height: "46px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.4)";
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.2)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              title="Đổi chiều ảnh"
+            >
+              <IoRefreshOutline size={20} />
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
