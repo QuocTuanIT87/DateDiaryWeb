@@ -39,3 +39,159 @@ export const decrypt = (hexStr: string): string => {
     return "";
   }
 };
+
+/**
+ * Helper to check if a string is encrypted (hex-encoded, length multiple of 4).
+ */
+export const isEncrypted = (str: any): boolean => {
+  return typeof str === "string" && str.length % 4 === 0 && /^[0-9a-fA-F]+$/.test(str);
+};
+
+/**
+ * Encrypts any type of value (string, number, array) to an encrypted hex string.
+ */
+export const encryptValue = (val: any, isArray = false, isNumber = false): string | null => {
+  if (val === null || val === undefined) return null;
+  let strToEncrypt = "";
+  if (isArray) {
+    strToEncrypt = JSON.stringify(val || []);
+  } else if (isNumber) {
+    strToEncrypt = String(val || 0);
+  } else {
+    strToEncrypt = String(val);
+  }
+  return encrypt(strToEncrypt);
+};
+
+/**
+ * Decrypts any value, falling back to plain value if it is not encrypted.
+ */
+export const decryptValue = (val: any, isArray = false, isNumber = false): any => {
+  if (val === null || val === undefined) return val;
+  if (isEncrypted(val)) {
+    const decrypted = decrypt(val);
+    let parsedVal = decrypted;
+    if (isArray) {
+      try {
+        parsedVal = JSON.parse(decrypted || "[]");
+      } catch {
+        parsedVal = decrypted;
+      }
+    }
+    
+    // Recursive decryption for double-encrypted data
+    if (typeof parsedVal === "string" && isEncrypted(parsedVal)) {
+      return decryptValue(parsedVal, isArray, isNumber);
+    }
+    
+    if (isArray) {
+      return Array.isArray(parsedVal) ? parsedVal : [];
+    }
+    if (isNumber) {
+      const num = parseFloat(parsedVal);
+      return isNaN(num) ? 0 : num;
+    }
+    return parsedVal;
+  }
+  
+  // Plain text fallback
+  if (isArray) {
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        if (typeof parsed === "string" && isEncrypted(parsed)) {
+          return decryptValue(parsed, isArray, isNumber);
+        }
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return Array.isArray(val) ? val : [];
+  }
+  if (isNumber) {
+    const num = typeof val === "number" ? val : parseFloat(val);
+    return isNaN(num) ? 0 : num;
+  }
+  return val;
+};
+
+// --- Model specific field-level encryption mapping ---
+
+export const encryptUser = (user: any): any => {
+  return {
+    id: user.id, // keep plain
+    name: encryptValue(user.name),
+    phone: encryptValue(user.phone),
+    facebook: encryptValue(user.facebook),
+    tiktok: encryptValue(user.tiktok),
+    interest: encryptValue(user.interest, true),
+    dislike: encryptValue(user.dislike, true),
+    hate: encryptValue(user.hate, true),
+    height: encryptValue(user.height, false, true),
+    weight: encryptValue(user.weight, false, true),
+    birthday: encryptValue(user.birthday),
+    gender: encryptValue(user.gender),
+    shoeSize: user.shoeSize !== undefined ? encryptValue(user.shoeSize) : null,
+    shirtSize: user.shirtSize !== undefined ? encryptValue(user.shirtSize) : null,
+    avatar: user.avatar !== undefined ? encryptValue(user.avatar) : null,
+  };
+};
+
+export const decryptUser = (data: any): any => {
+  return {
+    id: data.id || "",
+    name: decryptValue(data.name) || "",
+    phone: decryptValue(data.phone) || "",
+    facebook: decryptValue(data.facebook) || "",
+    tiktok: decryptValue(data.tiktok) || "",
+    interest: decryptValue(data.interest, true) || [],
+    dislike: decryptValue(data.dislike, true) || [],
+    hate: decryptValue(data.hate, true) || [],
+    height: decryptValue(data.height, false, true) || 0,
+    weight: decryptValue(data.weight, false, true) || 0,
+    birthday: decryptValue(data.birthday) || "",
+    gender: decryptValue(data.gender) || "Nam",
+    shoeSize: data.shoeSize !== undefined && data.shoeSize !== null ? decryptValue(data.shoeSize) : undefined,
+    shirtSize: data.shirtSize !== undefined && data.shirtSize !== null ? decryptValue(data.shirtSize) : undefined,
+    avatar: data.avatar !== undefined && data.avatar !== null ? decryptValue(data.avatar) : undefined,
+  };
+};
+
+export const encryptType = (type: any): any => {
+  return {
+    id: type.id, // keep plain
+    name: encryptValue(type.name),
+    deleteAt: type.deleteAt !== undefined && type.deleteAt !== null ? encryptValue(type.deleteAt) : null,
+  };
+};
+
+export const decryptType = (data: any): any => {
+  return {
+    id: data.id || "",
+    name: decryptValue(data.name) || "",
+    deleteAt: data.deleteAt !== undefined && data.deleteAt !== null ? decryptValue(data.deleteAt) : undefined,
+  };
+};
+
+export const encryptHistoryItem = (item: any): any => {
+  return {
+    id: item.id, // keep plain
+    time: encryptValue(item.time),
+    type: encryptValue(item.type),
+    note: encryptValue(item.note),
+    imageList: encryptValue(item.imageList, true),
+    reason: encryptValue(item.reason),
+  };
+};
+
+export const decryptHistoryItem = (data: any): any => {
+  return {
+    id: data.id || "",
+    time: decryptValue(data.time) || "",
+    type: decryptValue(data.type) || "",
+    note: decryptValue(data.note) || "",
+    imageList: decryptValue(data.imageList, true) || [],
+    reason: decryptValue(data.reason) || "",
+  };
+};
