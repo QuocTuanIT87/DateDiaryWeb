@@ -393,7 +393,7 @@ button:active {
 }
 
 .timeline-time-cute {
-  font-family: var(--font-cute);
+  font-family: var(--font-handwriting);
   font-size: 18px;
   font-weight: 700;
   color: var(--primary-dark);
