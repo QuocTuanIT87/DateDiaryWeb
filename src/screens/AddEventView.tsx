@@ -22,6 +22,41 @@ import {
 } from "react-icons/io5";
 import { MdZoomIn, MdZoomOut } from "react-icons/md";
 
+interface WordSlideUpProps {
+  text: string;
+  delayOffset?: number;
+}
+
+const WordSlideUp: React.FC<WordSlideUpProps> = ({ text, delayOffset = 0 }) => {
+  if (!text) return null;
+  const words = text.split(" ");
+  return (
+    <>
+      {words.map((word, idx) => (
+        <span
+          key={idx}
+          style={{
+            display: "inline-block",
+            overflow: "hidden",
+            verticalAlign: "bottom",
+            marginRight: "0.25em",
+          }}
+        >
+          <span
+            className="slide-word-inner"
+            style={{
+              display: "inline-block",
+              animationDelay: `${delayOffset + idx * 0.03}s`,
+            }}
+          >
+            {word}
+          </span>
+        </span>
+      ))}
+    </>
+  );
+};
+
 export const AddEventView: React.FC = () => {
   const [history, setHistory] = useState<DateHistory[]>([]);
   const [allHistory, setAllHistory] = useState<DateHistory[]>([]);
@@ -101,6 +136,71 @@ export const AddEventView: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (history.length === 0) return;
+
+    const scrollContainer = document.querySelector(".main-content-scroll");
+    let lastScrollTop = 0;
+    let scrollDirection: "down" | "up" = "down";
+
+    const handleScroll = () => {
+      let currentScrollTop = 0;
+      if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+        currentScrollTop = scrollContainer.scrollTop;
+      } else {
+        currentScrollTop = window.scrollY || document.documentElement.scrollTop;
+      }
+
+      if (currentScrollTop > lastScrollTop) {
+        scrollDirection = "down";
+      } else if (currentScrollTop < lastScrollTop) {
+        scrollDirection = "up";
+      }
+      lastScrollTop = currentScrollTop;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const target = entry.target as HTMLElement;
+          if (entry.isIntersecting) {
+            if (scrollDirection === "down") {
+              target.classList.add("animate-wave");
+              target.classList.remove("hide-elements");
+            } else {
+              target.classList.add("show-instantly");
+              target.classList.remove("hide-elements");
+            }
+          } else {
+            target.classList.remove("animate-wave");
+            target.classList.remove("show-instantly");
+            target.classList.add("hide-elements");
+          }
+        });
+      },
+      {
+        threshold: 0.05,
+        rootMargin: "0px 0px -40px 0px",
+      }
+    );
+
+    const rows = document.querySelectorAll(".timeline-row");
+    rows.forEach((row) => observer.observe(row));
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (scrollContainer) {
+        scrollContainer.removeEventListener("scroll", handleScroll);
+      }
+      observer.disconnect();
+    };
+  }, [history]);
 
   const handleLoadMore = () => {
     if (history.length >= allHistory.length) return;
@@ -477,7 +577,7 @@ export const AddEventView: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    className="timeline-row"
+                    className="timeline-row hide-elements"
                     style={{
                       zIndex: history.length - index,
                     }}
@@ -508,7 +608,7 @@ export const AddEventView: React.FC = () => {
 
                         {/* Cute Time Font */}
                         <div className="timeline-time-cute">
-                          📅 {formatDateTime(item.time)}
+                          <WordSlideUp text={"📅 " + formatDateTime(item.time)} />
                         </div>
 
                         {/* Dating category type badge */}
@@ -527,7 +627,9 @@ export const AddEventView: React.FC = () => {
                         </div>
 
                         {/* Ghi chú */}
-                        <p className="diary-note">{item.note}</p>
+                        <p className="diary-note">
+                          <WordSlideUp text={item.note} delayOffset={0.2} />
+                        </p>
 
                         {/* Occasion / Reason if exists */}
                         {item.reason && (

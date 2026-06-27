@@ -261,6 +261,39 @@ button:active {
   }
 }
 
+/* Scroll-triggered word slide-up animations */
+.slide-word-inner {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.hide-elements .slide-word-inner {
+  transform: translateY(115%);
+  opacity: 0;
+}
+
+.show-instantly .slide-word-inner {
+  transform: translateY(0) !important;
+  opacity: 1 !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+.animate-wave .slide-word-inner {
+  animation: diaryWordSlideUp 0.65s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes diaryWordSlideUp {
+  0% {
+    transform: translateY(115%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Timeline and Diary Feed Layout */
 .timeline-row {
   display: flex;
