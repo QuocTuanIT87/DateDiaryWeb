@@ -267,6 +267,11 @@ button:active {
   will-change: transform, opacity;
 }
 
+.timeline-time-cute span,
+.diary-note span {
+  font-family: var(--font-handwriting) !important;
+}
+
 .hide-elements .slide-word-inner {
   transform: translateY(115%);
   opacity: 0;
