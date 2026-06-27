@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AsyncStorageService,
   type DateType,
@@ -7,6 +7,7 @@ import {
   GoogleDriveService,
   type GoogleUser,
 } from "../services/GoogleDriveService";
+import { useApp } from "../context/AppContext";
 import { CustomAlert } from "../components/CustomAlert";
 import { StatsView } from "./StatsView";
 import {
@@ -17,9 +18,13 @@ import {
   IoTrashOutline,
   IoCreateOutline,
   IoAddOutline,
+  IoImageOutline,
 } from "react-icons/io5";
 
 export const SettingsView: React.FC = () => {
+  const { backgroundImage, updateBackgroundImage } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [types, setTypes] = useState<DateType[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -78,6 +83,13 @@ export const SettingsView: React.FC = () => {
       const userInfo = await GoogleDriveService.loginGoogle();
       setGoogleConnected(true);
       setGoogleUser(userInfo);
+
+      // Sync background from Drive after login
+      const driveBg = await GoogleDriveService.syncBackgroundFromDrive();
+      if (driveBg) {
+        await updateBackgroundImage(driveBg);
+      }
+
       CustomAlert.success(
         "Thành công",
         "Kết nối tài khoản Google Drive thành công!",
@@ -105,6 +117,63 @@ export const SettingsView: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Background Image Handlers
+  const handleUploadBackground = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const localUri = URL.createObjectURL(file);
+
+    try {
+      setLoading(true);
+      const driveUrl = await GoogleDriveService.uploadBackground(localUri);
+      await updateBackgroundImage(driveUrl);
+      CustomAlert.success(
+        "Thành công",
+        "Đã tải lên và thiết lập hình nền website mới!",
+      );
+    } catch (err: any) {
+      console.error("Upload background error:", err);
+      CustomAlert.alert(
+        "Lỗi",
+        err.message || "Không thể tải hình nền lên Google Drive.",
+      );
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDeleteBackground = () => {
+    CustomAlert.alert(
+      "Xác nhận xóa",
+      "Bạn có chắc muốn xóa hình nền website và quay về nền mặc định?",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await GoogleDriveService.deleteBackgroundOnDrive();
+              await updateBackgroundImage(null);
+              CustomAlert.success("Thành công", "Đã xóa hình nền website.");
+            } catch (err: any) {
+              console.error("Delete background error:", err);
+              CustomAlert.alert("Lỗi", "Không thể xóa hình nền trên Drive.");
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Categories CRUD
@@ -297,6 +366,7 @@ export const SettingsView: React.FC = () => {
                     <img
                       src={googleUser.avatar}
                       alt="Avatar Google"
+                      referrerPolicy="no-referrer"
                       style={{
                         width: "40px",
                         height: "40px",
@@ -455,7 +525,7 @@ export const SettingsView: React.FC = () => {
               borderRadius: "var(--radius-lg)",
               padding: "20px",
               border: "1px solid var(--border)",
-              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.01)"
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.01)",
             }}
           >
             <h3
@@ -467,13 +537,21 @@ export const SettingsView: React.FC = () => {
                 marginBottom: "10px",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
               }}
             >
               <span>Thống kê Hẹn hò 📊</span>
             </h3>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "14px" }}>
-              Xem tần suất gặp mặt, phân tích các loại hoạt động và chi tiết danh sách kỷ niệm của hai bạn.
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                lineHeight: 1.5,
+                marginBottom: "14px",
+              }}
+            >
+              Xem tần suất gặp mặt, phân tích các loại hoạt động và chi tiết
+              danh sách kỷ niệm của hai bạn.
             </p>
             <button
               onClick={() => setShowStats(true)}
@@ -484,11 +562,127 @@ export const SettingsView: React.FC = () => {
                 backgroundColor: "var(--primary-light)",
                 color: "var(--primary-dark)",
                 fontSize: "13px",
-                fontWeight: 700
+                fontWeight: 700,
               }}
             >
               Xem báo cáo Thống kê
             </button>
+          </div>
+
+          {/* SECTION: Website Background */}
+          <div
+            style={{
+              backgroundColor: "var(--surface)",
+              borderRadius: "var(--radius-lg)",
+              padding: "20px",
+              border: "1px solid var(--border)",
+              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.01)",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "14px",
+                fontWeight: 700,
+                color: "var(--text)",
+                fontFamily: "var(--font-display)",
+                marginBottom: "14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <IoImageOutline size={18} color="var(--primary)" />
+              <span>Hình nền Website 🖼️</span>
+            </h3>
+
+            {/* Current Background Preview if exists */}
+            {backgroundImage ? (
+              <div style={{ marginBottom: "14px" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    borderRadius: "var(--radius-md)",
+                    overflow: "hidden",
+                    border: "1px solid var(--border)",
+                    width: "100%",
+                    height: "120px",
+                  }}
+                >
+                  <img
+                    src={backgroundImage}
+                    referrerPolicy="no-referrer"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    alt="Background Preview"
+                  />
+                </div>
+                <button
+                  onClick={handleDeleteBackground}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--danger)",
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    marginTop: "8px",
+                    cursor: loading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Xóa hình nền
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: "80px",
+                  border: "2px dashed var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  marginBottom: "14px",
+                }}
+              >
+                🌸 Chưa cài đặt hình nền
+              </div>
+            )}
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!googleConnected || loading}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "var(--radius-md)",
+                backgroundColor:
+                  googleConnected && !loading
+                    ? "var(--primary)"
+                    : "var(--border)",
+                color:
+                  googleConnected && !loading ? "#ffffff" : "var(--text-muted)",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: googleConnected && !loading ? "pointer" : "not-allowed",
+              }}
+            >
+              {backgroundImage ? "Thay đổi hình nền" : "Tải lên hình nền mới"}
+            </button>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleUploadBackground}
+            />
           </div>
         </div>
 

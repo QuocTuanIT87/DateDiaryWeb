@@ -1,6 +1,7 @@
 import { db } from "./firebase";
 import { ref, get, set, remove } from "firebase/database";
 import {
+  encrypt,
   decrypt,
   isEncrypted,
   encryptUser,
@@ -9,16 +10,10 @@ import {
   decryptType,
   encryptHistoryItem,
   decryptHistoryItem,
+  SecureStorage,
 } from "../utils/encryption";
 
-const MIGRATION_FLAG_KEY = "@fireheart_firebase_field_encryption_migration_done_v2";
 
-// Keys used in localStorage (representing mobile's AsyncStorage)
-const KEYS = {
-  HISTORY: "@fireheart_history_v1",
-  TYPES: "@fireheart_types_v1",
-  USERS: "@fireheart_users_v1",
-};
 
 // Types definition
 export interface DateHistory {
@@ -74,6 +69,9 @@ const DEFAULT_DATE_TYPES: DateType[] = [
   { id: "type_5", name: "Du lịch nghỉ dưỡng ✈️" },
 ];
 
+const DB_PREFIX = "/MayTrangSatsBoy";
+const dbRef = (path?: string) => ref(db, path ? DB_PREFIX + path : DB_PREFIX);
+
 export const AsyncStorageService = {
   // --- Start Milestones ---
   getStartTime(): DateStartTime {
@@ -83,7 +81,7 @@ export const AsyncStorageService = {
   // --- DateUser Operations ---
   async getUsers(): Promise<DateUser[]> {
     try {
-      const snapshot = await get(ref(db, "/users"));
+      const snapshot = await get(dbRef("/users"));
       const val = snapshot.val();
       if (!val) return [];
       if (typeof val === "string") {
@@ -91,7 +89,7 @@ export const AsyncStorageService = {
         if (!decrypted) return [];
         const parsed = JSON.parse(decrypted) as DateUser[];
         // Auto-migrate to new field-level encrypted format
-        await set(ref(db, "/users"), parsed.map(encryptUser));
+        await set(dbRef("/users"), parsed.map(encryptUser));
         return parsed;
       }
       if (Array.isArray(val) || typeof val === "object") {
@@ -99,7 +97,7 @@ export const AsyncStorageService = {
         const parsed = list.filter(Boolean).map(decryptUser);
         const needsReSave = list.some(item => item && !isEncrypted(item.name));
         if (needsReSave) {
-          await set(ref(db, "/users"), parsed.map(encryptUser));
+          await set(dbRef("/users"), parsed.map(encryptUser));
         }
         return parsed;
       }
@@ -115,13 +113,13 @@ export const AsyncStorageService = {
     const formattedUser1 = { ...user1, id: "user_1" };
     const formattedUser2 = { ...user2, id: "user_2" };
     const data = [formattedUser1, formattedUser2];
-    await set(ref(db, "/users"), data.map(encryptUser));
+    await set(dbRef("/users"), data.map(encryptUser));
   },
 
   // --- DateType Operations ---
   async getTypes(includeArchived = false): Promise<DateType[]> {
     try {
-      const snapshot = await get(ref(db, "/types"));
+      const snapshot = await get(dbRef("/types"));
       const val = snapshot.val();
       let types: DateType[] | null = null;
       if (val !== null) {
@@ -129,20 +127,20 @@ export const AsyncStorageService = {
           const decrypted = decrypt(val);
           if (decrypted) {
             types = JSON.parse(decrypted) as DateType[];
-            await set(ref(db, "/types"), types.map(encryptType));
+            await set(dbRef("/types"), types.map(encryptType));
           }
         } else if (Array.isArray(val) || typeof val === "object") {
           const list: any[] = Array.isArray(val) ? val : Object.values(val);
           types = list.filter(Boolean).map(decryptType);
           const needsReSave = list.some(item => item && !isEncrypted(item.name));
           if (needsReSave) {
-            await set(ref(db, "/types"), types.map(encryptType));
+            await set(dbRef("/types"), types.map(encryptType));
           }
         }
       }
       if (types === null) {
         // Seed default types
-        await set(ref(db, "/types"), DEFAULT_DATE_TYPES.map(encryptType));
+        await set(dbRef("/types"), DEFAULT_DATE_TYPES.map(encryptType));
         types = DEFAULT_DATE_TYPES;
       }
       if (!includeArchived) {
@@ -156,7 +154,7 @@ export const AsyncStorageService = {
   },
 
   async saveTypes(types: DateType[]): Promise<void> {
-    await set(ref(db, "/types"), types.map(encryptType));
+    await set(dbRef("/types"), types.map(encryptType));
   },
 
   async addType(name: string): Promise<DateType> {
@@ -231,14 +229,14 @@ export const AsyncStorageService = {
   // --- DateHistory Operations ---
   async getHistory(): Promise<DateHistory[]> {
     try {
-      const snapshot = await get(ref(db, "/history"));
+      const snapshot = await get(dbRef("/history"));
       const val = snapshot.val();
       if (!val) return [];
       if (typeof val === "string") {
         const decrypted = decrypt(val);
         if (!decrypted) return [];
         const parsed = JSON.parse(decrypted) as DateHistory[];
-        await set(ref(db, "/history"), parsed.map(encryptHistoryItem));
+        await set(dbRef("/history"), parsed.map(encryptHistoryItem));
         return parsed;
       }
       if (Array.isArray(val) || typeof val === "object") {
@@ -246,7 +244,7 @@ export const AsyncStorageService = {
         const parsed = list.filter(Boolean).map(decryptHistoryItem);
         const needsReSave = list.some(item => item && !isEncrypted(item.time));
         if (needsReSave) {
-          await set(ref(db, "/history"), parsed.map(encryptHistoryItem));
+          await set(dbRef("/history"), parsed.map(encryptHistoryItem));
         }
         return parsed;
       }
@@ -258,7 +256,7 @@ export const AsyncStorageService = {
   },
 
   async saveHistoryList(history: DateHistory[]): Promise<void> {
-    await set(ref(db, "/history"), history.map(encryptHistoryItem));
+    await set(dbRef("/history"), history.map(encryptHistoryItem));
   },
 
   async addHistoryItem(item: Omit<DateHistory, "id">): Promise<DateHistory> {
@@ -302,10 +300,19 @@ export const AsyncStorageService = {
 
   // --- Clear & Import ---
   async clearAll(): Promise<void> {
-    await remove(ref(db));
+    await remove(dbRef());
+    // Clear secure storage keys
+    SecureStorage.removeItem("@fireheart_google_token");
+    SecureStorage.removeItem("@fireheart_security_passed");
+    SecureStorage.removeItem("@fireheart_security_lock");
+    // Clear raw plain-text keys (legacy)
+    localStorage.removeItem("@fireheart_google_token");
+    localStorage.removeItem("@fireheart_security_passed");
+    localStorage.removeItem("@fireheart_security_lock");
+    // Explicitly delete any old migration keys if they exist in localStorage
     localStorage.removeItem("@fireheart_firebase_migration_done");
     localStorage.removeItem("@fireheart_firebase_encryption_migration_done");
-    localStorage.removeItem(MIGRATION_FLAG_KEY);
+    localStorage.removeItem("@fireheart_firebase_field_encryption_migration_done_v2");
   },
 
   /**
@@ -321,7 +328,7 @@ export const AsyncStorageService = {
         const list = Array.isArray(data.users) ? data.users : Object.values(data.users);
         parsedUsers = list.filter(Boolean).map(decryptUser);
       }
-      await set(ref(db, "/users"), parsedUsers.map(encryptUser));
+      await set(dbRef("/users"), parsedUsers.map(encryptUser));
     } else {
       throw new Error("Dữ liệu sao lưu không chứa đúng người dùng.");
     }
@@ -335,7 +342,7 @@ export const AsyncStorageService = {
         const list = Array.isArray(data.types) ? data.types : Object.values(data.types);
         parsedTypes = list.filter(Boolean).map(decryptType);
       }
-      await set(ref(db, "/types"), parsedTypes.map(encryptType));
+      await set(dbRef("/types"), parsedTypes.map(encryptType));
     }
 
     if (data.history) {
@@ -347,7 +354,7 @@ export const AsyncStorageService = {
         const list = Array.isArray(data.history) ? data.history : Object.values(data.history);
         parsedHistory = list.filter(Boolean).map(decryptHistoryItem);
       }
-      await set(ref(db, "/history"), parsedHistory.map(encryptHistoryItem));
+      await set(dbRef("/history"), parsedHistory.map(encryptHistoryItem));
     }
   },
 
@@ -355,9 +362,9 @@ export const AsyncStorageService = {
    * Exports raw database tables as JSON, used for backup creation.
    */
   async exportRawBackup(): Promise<{ history: any; types: any; users: any }> {
-    const snapshotHistory = await get(ref(db, "/history"));
-    const snapshotTypes = await get(ref(db, "/types"));
-    const snapshotUsers = await get(ref(db, "/users"));
+    const snapshotHistory = await get(dbRef("/history"));
+    const snapshotTypes = await get(dbRef("/types"));
+    const snapshotUsers = await get(dbRef("/users"));
 
     return {
       history: snapshotHistory.val() || [],
@@ -366,68 +373,33 @@ export const AsyncStorageService = {
     };
   },
 
-  /**
-   * One-time migration script from localStorage to Firebase Realtime Database.
-   */
-  async runFirebaseMigrationIfNeeded(): Promise<void> {
+  async getBackgroundUrl(): Promise<string | null> {
     try {
-      const migrationDone = localStorage.getItem("@fireheart_firebase_migration_done");
-      if (migrationDone === "true") {
-        return; // Already migrated
+      const snapshot = await get(dbRef("/background"));
+      const val = snapshot.val();
+      if (!val) return null;
+      if (typeof val === "string") {
+        const decrypted = decrypt(val);
+        return decrypted || val;
       }
-
-      console.log("[Migration] Starting Firebase migration...");
-
-      // 1. Get old local users
-      const rawUsers = localStorage.getItem(KEYS.USERS);
-      let users: DateUser[] = [];
-      if (rawUsers) {
-        const decrypted = decrypt(rawUsers);
-        if (decrypted) users = JSON.parse(decrypted);
-      }
-
-      // 2. Get old local types
-      const rawTypes = localStorage.getItem(KEYS.TYPES);
-      let types: DateType[] = [];
-      if (rawTypes) {
-        const decrypted = decrypt(rawTypes);
-        if (decrypted) types = JSON.parse(decrypted);
-      }
-
-      // 3. Get old local history
-      const rawHistory = localStorage.getItem(KEYS.HISTORY);
-      let history: DateHistory[] = [];
-      if (rawHistory) {
-        const decrypted = decrypt(rawHistory);
-        if (decrypted) history = JSON.parse(decrypted);
-      }
-
-      // If there is no local data, just set flag and exit
-      if (users.length === 0 && types.length === 0 && history.length === 0) {
-        localStorage.setItem("@fireheart_firebase_migration_done", "true");
-        console.log("[Migration] No local data to migrate. Finished.");
-        return;
-      }
-
-      console.log(`[Migration] Found local data: ${users.length} users, ${types.length} types, ${history.length} history items.`);
-
-      // 4. Write migrated data directly to Firebase Realtime Database (encrypted)
-      console.log("[Migration] Saving migrated data to Firebase Realtime Database...");
-      if (users.length > 0) {
-        await set(ref(db, "/users"), users.map(encryptUser));
-      }
-      if (types.length > 0) {
-        await set(ref(db, "/types"), types.map(encryptType));
-      }
-      if (history.length > 0) {
-        await set(ref(db, "/history"), history.map(encryptHistoryItem));
-      }
-
-      // Mark as completed
-      localStorage.setItem("@fireheart_firebase_migration_done", "true");
-      console.log("[Migration] Firebase migration completed successfully!");
+      return null;
     } catch (error) {
-      console.error("[Migration] Firebase migration failed:", error);
+      console.error("Firebase getBackgroundUrl failed:", error);
+      return null;
+    }
+  },
+
+  async setBackgroundUrl(url: string | null): Promise<void> {
+    try {
+      if (url === null) {
+        await remove(dbRef("/background"));
+      } else {
+        const encrypted = encrypt(url);
+        await set(dbRef("/background"), encrypted);
+      }
+    } catch (error) {
+      console.error("Firebase setBackgroundUrl failed:", error);
+      throw error;
     }
   },
 };

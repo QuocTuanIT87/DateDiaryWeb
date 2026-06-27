@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { encrypt, decrypt } from "../utils/encryption";
+import { SecureStorage } from "../utils/encryption";
 import { IoLockClosedOutline, IoKeyOutline } from "react-icons/io5";
 
 // Security storage keys
@@ -91,15 +91,14 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({ onPassed }) => {
   // 1. Initial State Load & Check Locks
   useEffect(() => {
     // Check if locked
-    const encryptedLock = localStorage.getItem(LOCK_UNTIL_KEY);
-    if (encryptedLock) {
-      const decryptedLock = decrypt(encryptedLock);
+    const decryptedLock = SecureStorage.getItem(LOCK_UNTIL_KEY);
+    if (decryptedLock) {
       const lockTimestamp = parseInt(decryptedLock, 10);
       if (!isNaN(lockTimestamp) && lockTimestamp > Date.now()) {
         setLockUntil(lockTimestamp);
         setTimeLeft(Math.ceil((lockTimestamp - Date.now()) / 1000));
       } else {
-        localStorage.removeItem(LOCK_UNTIL_KEY);
+        SecureStorage.removeItem(LOCK_UNTIL_KEY);
       }
     }
 
@@ -125,7 +124,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({ onPassed }) => {
         setAttemptsQ1(0);
         setAttemptsQ3(0);
         setStep(1);
-        localStorage.removeItem(LOCK_UNTIL_KEY);
+        SecureStorage.removeItem(LOCK_UNTIL_KEY);
       } else {
         setTimeLeft(remaining);
       }
@@ -140,7 +139,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({ onPassed }) => {
     setLockUntil(unlockTime);
     setTimeLeft(durationMinutes * 60);
     setStep(1); // Always reset to Q1 upon lock trigger
-    localStorage.setItem(LOCK_UNTIL_KEY, encrypt(unlockTime.toString()));
+    SecureStorage.setItem(LOCK_UNTIL_KEY, unlockTime.toString());
   };
 
   // 4. Handle Q1 selection
@@ -171,7 +170,7 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({ onPassed }) => {
     const correctPassword = calculatePassword();
     if (passwordInput.trim() === correctPassword) {
       // Save authenticated date (encrypted)
-      localStorage.setItem(AUTH_DATE_KEY, encrypt(getTodayString()));
+      SecureStorage.setItem(AUTH_DATE_KEY, getTodayString());
       onPassed();
     } else {
       setPasswordInput("");

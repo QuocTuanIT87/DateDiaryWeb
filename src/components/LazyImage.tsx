@@ -82,6 +82,7 @@ export const LazyImage: React.FC<LazyImageProps> = ({
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
         onClick={onClick}
+        referrerPolicy="no-referrer"
         {...props}
         style={{
           ...style,

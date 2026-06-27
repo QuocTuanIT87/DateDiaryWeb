@@ -1,4 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Itim&family=Fredoka:wght@300..700&display=swap');
+
+@font-face {
+  font-family: 'SyneMono';
+  src: url('./assets/fonts/SyneMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
 
 :root {
   /* Color Palette */
@@ -27,6 +34,8 @@
   /* Fonts */
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Outfit', sans-serif;
+  --font-cute: 'Fredoka', 'Itim', cursive;
+  --font-handwriting: 'SyneMono', monospace;
 
   /* Border radius */
   --radius-sm: 8px;
@@ -73,9 +82,8 @@ body {
 .responsive-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 20px;
   width: 100%;
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
@@ -113,21 +121,47 @@ body {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes heartBeat {
-  0% { transform: scale(1); }
-  14% { transform: scale(1.12); }
-  28% { transform: scale(1); }
-  42% { transform: scale(1.12); }
-  70% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  14% {
+    transform: scale(1.12);
+  }
+
+  28% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(1.12);
+  }
+
+  70% {
+    transform: scale(1);
+  }
 }
 
 .animate-fade {
@@ -143,8 +177,13 @@ body {
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton-shimmer {
@@ -158,20 +197,26 @@ body {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: rgba(85, 150, 224, 0.02);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: var(--radius-full);
   border: 2px solid var(--background);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-active);
 }
 
 /* Global inputs & buttons */
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   outline: none;
   border: none;
 }
@@ -213,5 +258,170 @@ button:active {
 @media (max-width: 768px) {
   .main-wrapper {
     flex-direction: column;
+  }
+}
+
+/* Timeline and Diary Feed Layout */
+.timeline-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.timeline-left-track {
+  width: 20px;
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* The continuous vertical connector line */
+.timeline-left-track::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  /* center of the 20px track */
+  top: 0;
+  bottom: -24px;
+  /* extends through the 24px margin-bottom of the row */
+  width: 2px;
+  background-color: var(--primary);
+  opacity: 0.35;
+  z-index: 1;
+}
+
+/* First item: start the vertical line at the dot level */
+.timeline-row:first-child .timeline-left-track::before {
+  top: 24px;
+}
+
+/* Last item: stop the line at the dot level and don't extend below */
+.timeline-row:last-child .timeline-left-track::before {
+  bottom: auto;
+  height: 24px;
+}
+
+/* Single item list: hide the vertical line completely */
+.timeline-row:first-child:last-child .timeline-left-track::before {
+  display: none;
+}
+
+/* Timeline node bullet dot */
+.timeline-dot {
+  position: absolute;
+  left: 4px;
+  /* centers the 12px dot on the 2px line */
+  top: 24px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  border: 2px solid var(--background);
+  box-shadow: 0 0 0 2px var(--accent);
+  z-index: 2;
+}
+
+.timeline-right-content {
+  flex: 1;
+  display: flex;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* Column 1: Square details card containing text details */
+.timeline-col-1-card {
+  width: 280px;
+  height: 280px;
+  aspect-ratio: 1;
+  background-color: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 6px -1px rgba(85, 150, 224, 0.02);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  /* vertical scrollbar if notes are long */
+  flex-shrink: 0;
+}
+
+/* Column 2: Images container (tách biệt hoàn toàn) */
+.timeline-col-2-images {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 732px;
+  /* fits exactly 5 images of 140px width + gaps */
+}
+
+.timeline-time-cute {
+  font-family: var(--font-cute);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diary-note {
+  font-family: var(--font-handwriting);
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.diary-images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.diary-image-wrapper {
+  width: 140px;
+  height: 140px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.diary-image-wrapper:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.diary-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1100px) {
+  .timeline-row {
+    flex-wrap: wrap;
+  }
+
+  .timeline-right-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .timeline-col-2-images {
+    min-width: 0;
+    /* allows shrinking on tablet/mobile */
+    flex-basis: 100%;
   }
 }

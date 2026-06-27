@@ -76,14 +76,14 @@ export interface DurationDetails {
   seconds: number;
 }
 
-export const getDurationSince = (confessionIsoString: string): DurationDetails => {
+export const getDurationSince = (startIsoString: string): DurationDetails => {
   const result = { days: 0, hours: 0, minutes: 0, seconds: 0 };
-  if (!confessionIsoString) return result;
+  if (!startIsoString) return result;
 
   try {
-    const confessionTime = new Date(confessionIsoString).getTime();
+    const startTime = new Date(startIsoString).getTime();
     const currentTime = Date.now();
-    const difference = currentTime - confessionTime;
+    const difference = currentTime - startTime;
 
     if (difference <= 0) return result;
 

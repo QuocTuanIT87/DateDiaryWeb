@@ -1,4 +1,4 @@
-import { encrypt, decrypt } from "../utils/encryption";
+import { encrypt, decrypt, SecureStorage } from "../utils/encryption";
 import { AsyncStorageService } from "./AsyncStorageService";
 
 export const GOOGLE_CLIENT_ID = import.meta.env.DEV
@@ -16,8 +16,10 @@ export interface GoogleUser {
 export interface BackupFile {
   id: string;          // File ID in Drive, or local URI
   name: string;        // Filename
-  createdTime: string; // ISO 8601 string
+  createdTime: string; // ISO 8601 stringS
 }
+
+const folderPromises: Record<string, Promise<string> | undefined> = {};
 
 export const GoogleDriveService = {
   // --- Client ID configuration ---
@@ -27,15 +29,15 @@ export const GoogleDriveService = {
 
   // --- Google OAuth ---
   async getAccessToken(): Promise<string | null> {
-    return localStorage.getItem(GOOGLE_TOKEN_KEY);
+    return SecureStorage.getItem(GOOGLE_TOKEN_KEY);
   },
 
   async saveAccessToken(token: string): Promise<void> {
-    localStorage.setItem(GOOGLE_TOKEN_KEY, token);
+    SecureStorage.setItem(GOOGLE_TOKEN_KEY, token);
   },
 
   async logoutGoogle(): Promise<void> {
-    localStorage.removeItem(GOOGLE_TOKEN_KEY);
+    SecureStorage.removeItem(GOOGLE_TOKEN_KEY);
   },
 
   async isLoggedIn(): Promise<boolean> {
@@ -329,50 +331,60 @@ export const GoogleDriveService = {
 
   // --- Helper Methods for Google Drive API ---
   async getOrCreateDriveFolder(folderName: string, token: string, parentId?: string): Promise<string> {
-    let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    if (parentId) {
-      query += ` and '${parentId}' in parents`;
-    } else {
-      query += ` and 'root' in parents`;
+    const cacheKey = `${folderName}_${parentId || "root"}`;
+    if (folderPromises[cacheKey]) {
+      return folderPromises[cacheKey];
     }
-    const checkRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
+
+    const promise = (async () => {
+      let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+      if (parentId) {
+        query += ` and '${parentId}' in parents`;
+      } else {
+        query += ` and 'root' in parents`;
       }
-    );
+      const checkRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-    if (checkRes.ok) {
-      const data = await checkRes.json();
-      if (data.files && data.files.length > 0) {
-        return data.files[0].id;
+      if (checkRes.ok) {
+        const data = await checkRes.json();
+        if (data.files && data.files.length > 0) {
+          return data.files[0].id;
+        }
       }
-    }
 
-    // Create folder
-    const body: any = {
-      name: folderName,
-      mimeType: "application/vnd.google-apps.folder",
-    };
-    if (parentId) {
-      body.parents = [parentId];
-    }
+      // Create folder
+      const body: any = {
+        name: folderName,
+        mimeType: "application/vnd.google-apps.folder",
+      };
+      if (parentId) {
+        body.parents = [parentId];
+      }
 
-    const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+      const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
-    if (!createRes.ok) {
-      throw new Error(`Không thể tạo thư mục ${folderName} trên Google Drive.`);
-    }
+      if (!createRes.ok) {
+        throw new Error(`Không thể tạo thư mục ${folderName} trên Google Drive.`);
+      }
 
-    const data = await createRes.json();
-    return data.id;
+      const data = await createRes.json();
+      return data.id;
+    })();
+
+    folderPromises[cacheKey] = promise;
+    return promise;
   },
 
   async uploadToDrive(localUri: string, fileName: string, mimeType: string, folderId: string, token: string): Promise<string> {
@@ -500,5 +512,91 @@ export const GoogleDriveService = {
       }
     }
     return url;
+  },
+
+  async uploadBackground(localUri: string): Promise<string> {
+    const token = await this.getAccessToken();
+    if (!token) throw new Error("Chưa kết nối tài khoản Google Drive. Vui lòng đăng nhập trước.");
+
+    const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
+    const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
+
+    // Delete existing files to maintain exactly 1 image
+    const query = `'${bgFolderId}' in parents and trashed = false`;
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (data.files && data.files.length > 0) {
+        for (const file of data.files) {
+          try {
+            await this.deleteFile(file.id);
+          } catch (err) {
+            console.warn("Failed to delete old background file:", err);
+          }
+        }
+      }
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const fileName = `background_${timestamp}.jpg`;
+
+    const fileId = await this.uploadToDrive(localUri, fileName, "image/jpeg", bgFolderId, token);
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1920`;
+  },
+
+  async deleteBackgroundOnDrive(): Promise<void> {
+    const token = await this.getAccessToken();
+    if (!token) throw new Error("Chưa kết nối tài khoản Google Drive.");
+
+    const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
+    const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
+
+    const query = `'${bgFolderId}' in parents and trashed = false`;
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (data.files && data.files.length > 0) {
+        for (const file of data.files) {
+          await this.deleteFile(file.id);
+        }
+      }
+    }
+  },
+
+  async syncBackgroundFromDrive(): Promise<string | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+
+    try {
+      const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
+      const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
+
+      const query = `'${bgFolderId}' in parents and trashed = false`;
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.files && data.files.length > 0) {
+          return `https://drive.google.com/thumbnail?id=${data.files[0].id}&sz=w1920`;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to sync background from Drive:", e);
+    }
+    return null;
   },
 };

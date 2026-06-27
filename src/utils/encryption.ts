@@ -195,3 +195,27 @@ export const decryptHistoryItem = (data: any): any => {
     reason: decryptValue(data.reason) || "",
   };
 };
+
+export const SecureStorage = {
+  getItem(key: string): string | null {
+    const encryptedKey = encrypt(key);
+    const encryptedValue = localStorage.getItem(encryptedKey);
+    if (!encryptedValue) return null;
+    return decrypt(encryptedValue);
+  },
+
+  setItem(key: string, value: string): void {
+    const encryptedKey = encrypt(key);
+    const encryptedValue = encrypt(value);
+    localStorage.setItem(encryptedKey, encryptedValue);
+  },
+
+  removeItem(key: string): void {
+    const encryptedKey = encrypt(key);
+    localStorage.removeItem(encryptedKey);
+  },
+
+  clear(): void {
+    localStorage.clear();
+  }
+};

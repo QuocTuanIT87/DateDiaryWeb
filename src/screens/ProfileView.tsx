@@ -47,8 +47,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
       setMilestones(startTime);
 
       // Calculate initial duration
-      if (startTime && startTime.confessionDay) {
-        setDuration(getDurationSince(startTime.confessionDay));
+      if (startTime && startTime.acquaintedDay) {
+        setDuration(getDurationSince(startTime.acquaintedDay));
       }
     } catch (error) {
       console.error("Load profiles failed:", error);
@@ -61,10 +61,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
 
   // Live anniversary counter ticking
   useEffect(() => {
-    if (!milestones || !milestones.confessionDay) return;
+    if (!milestones || !milestones.acquaintedDay) return;
 
     const interval = setInterval(() => {
-      setDuration(getDurationSince(milestones.confessionDay));
+      setDuration(getDurationSince(milestones.acquaintedDay));
     }, 1000);
 
     return () => clearInterval(interval);
