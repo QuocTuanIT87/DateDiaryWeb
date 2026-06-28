@@ -6,6 +6,7 @@ export const GOOGLE_CLIENT_ID = import.meta.env.DEV
   : "765227702920-lnphp8oe0b5pgjm1uq5ksgdi84j5p014.apps.googleusercontent.com";
 
 const GOOGLE_TOKEN_KEY = "@fireheart_google_token";
+const GOOGLE_TOKEN_EXPIRY_KEY = "@fireheart_google_token_expiry";
 
 export interface GoogleUser {
   email: string;
@@ -29,15 +30,31 @@ export const GoogleDriveService = {
 
   // --- Google OAuth ---
   async getAccessToken(): Promise<string | null> {
-    return SecureStorage.getItem(GOOGLE_TOKEN_KEY);
+    const token = SecureStorage.getItem(GOOGLE_TOKEN_KEY);
+    if (!token) return null;
+
+    const expiryStr = SecureStorage.getItem(GOOGLE_TOKEN_EXPIRY_KEY);
+    if (expiryStr) {
+      const expiry = parseInt(expiryStr, 10);
+      if (!isNaN(expiry) && expiry < Date.now()) {
+        console.log("Google session expired after 3 days. Logging out...");
+        await this.logoutGoogle();
+        return null;
+      }
+    }
+    return token;
   },
 
   async saveAccessToken(token: string): Promise<void> {
     SecureStorage.setItem(GOOGLE_TOKEN_KEY, token);
+    // Set expiration to 3 days from now
+    const expiryTime = Date.now() + 3 * 24 * 60 * 60 * 1000;
+    SecureStorage.setItem(GOOGLE_TOKEN_EXPIRY_KEY, expiryTime.toString());
   },
 
   async logoutGoogle(): Promise<void> {
     SecureStorage.removeItem(GOOGLE_TOKEN_KEY);
+    SecureStorage.removeItem(GOOGLE_TOKEN_EXPIRY_KEY);
   },
 
   async isLoggedIn(): Promise<boolean> {
@@ -225,7 +242,7 @@ export const GoogleDriveService = {
   },
 
   // --- Backup Operation ---
-  async performBackup(): Promise<string> {
+  async performBackup(): Promise<{ fileName: string; totalBackups: number; deletedCount: number }> {
     const token = await this.getAccessToken();
     if (!token) throw new Error("Chưa kết nối tài khoản Google Drive. Vui lòng đăng nhập trong mục Cài đặt trước.");
 
@@ -246,8 +263,12 @@ export const GoogleDriveService = {
     await this.uploadTextToDrive(encryptedContent, fileName, parentFolderId, token);
 
     // 5. Enforce cloud retention limit
-    await this.pruneBackups();
-    return fileName;
+    const pruneResult = await this.pruneBackups();
+    return {
+      fileName,
+      totalBackups: pruneResult.totalBackups,
+      deletedCount: pruneResult.deletedCount,
+    };
   },
 
   // --- List Backups ---
@@ -261,7 +282,7 @@ export const GoogleDriveService = {
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         query
-      )}&orderBy=createdTime desc&fields=files(id,name,createdTime)`,
+      )}&orderBy=createdTime desc&pageSize=100&fields=files(id,name,createdTime)`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -279,25 +300,37 @@ export const GoogleDriveService = {
     }));
   },
 
-  // --- Prune Backup Retention (Limit to 3 newest if total is >= 20) ---
-  async pruneBackups(): Promise<void> {
+  // --- Prune Backup Retention (Limit to 5 newest if total is > 20) ---
+  async pruneBackups(): Promise<{ totalBackups: number; deletedCount: number }> {
+    let totalBackups = 0;
+    let deletedCount = 0;
     try {
       const backups = await this.listBackups();
-      if (backups.length >= 20) {
-        const toDelete = backups.slice(3);
+      totalBackups = backups.length;
+      if (backups.length > 20) {
+        const toDelete = backups.slice(5);
+        deletedCount = toDelete.length;
         const token = await this.getAccessToken();
-        if (!token) return;
+        if (!token) return { totalBackups, deletedCount: 0 };
 
         for (const item of toDelete) {
-          await fetch(`https://www.googleapis.com/drive/v3/files/${item.id}`, {
+          console.log(`[Prune] Deleting backup: ${item.name} (${item.id})`);
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${item.id}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[Prune] Failed to delete ${item.name}:`, errText);
+          } else {
+            console.log(`[Prune] Successfully deleted ${item.name}`);
+          }
         }
       }
     } catch (error) {
       console.error("Failed to prune old backups:", error);
     }
+    return { totalBackups, deletedCount };
   },
 
   // --- Restore Operation ---
@@ -503,26 +536,26 @@ export const GoogleDriveService = {
     return match ? match[1] : null;
   },
 
-  resolveDriveUrl(url: string | undefined | null): string {
+  resolveDriveUrl(url: string | undefined | null, size: number = 800): string {
     if (!url) return "";
     if (url.includes("googleusercontent.com") || url.includes("drive.google.com") || url.includes("docs.google.com")) {
       const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       if (match && match[1]) {
-        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
+        return `https://lh3.googleusercontent.com/d/${match[1]}=s${size}`;
       }
     }
     return url;
   },
 
-  async uploadBackground(localUri: string): Promise<string> {
+  async uploadBackground(localUri: string, type: "desktop" | "mobile"): Promise<string> {
     const token = await this.getAccessToken();
     if (!token) throw new Error("Chưa kết nối tài khoản Google Drive. Vui lòng đăng nhập trước.");
 
     const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
     const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
 
-    // Delete existing files to maintain exactly 1 image
-    const query = `'${bgFolderId}' in parents and trashed = false`;
+    // Delete existing background files of the same type to maintain exactly 1 image per type
+    const query = `'${bgFolderId}' in parents and name contains 'background_${type}' and trashed = false`;
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
       {
@@ -536,27 +569,27 @@ export const GoogleDriveService = {
           try {
             await this.deleteFile(file.id);
           } catch (err) {
-            console.warn("Failed to delete old background file:", err);
+            console.warn(`Failed to delete old ${type} background file:`, err);
           }
         }
       }
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
-    const fileName = `background_${timestamp}.jpg`;
+    const fileName = `background_${type}_${timestamp}.jpg`;
 
     const fileId = await this.uploadToDrive(localUri, fileName, "image/jpeg", bgFolderId, token);
-    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1920`;
+    return `https://lh3.googleusercontent.com/d/${fileId}=s1920`;
   },
 
-  async deleteBackgroundOnDrive(): Promise<void> {
+  async deleteBackgroundOnDrive(type: "desktop" | "mobile"): Promise<void> {
     const token = await this.getAccessToken();
     if (!token) throw new Error("Chưa kết nối tài khoản Google Drive.");
 
     const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
     const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
 
-    const query = `'${bgFolderId}' in parents and trashed = false`;
+    const query = `'${bgFolderId}' in parents and name contains 'background_${type}' and trashed = false`;
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
       {
@@ -573,7 +606,7 @@ export const GoogleDriveService = {
     }
   },
 
-  async syncBackgroundFromDrive(): Promise<string | null> {
+  async syncBackgroundFromDrive(type: "desktop" | "mobile"): Promise<string | null> {
     const token = await this.getAccessToken();
     if (!token) return null;
 
@@ -581,7 +614,7 @@ export const GoogleDriveService = {
       const rootFolderId = await this.getOrCreateDriveFolder("DateDiaryData", token);
       const bgFolderId = await this.getOrCreateDriveFolder("DateDiaryBackground", token, rootFolderId);
 
-      const query = `'${bgFolderId}' in parents and trashed = false`;
+      const query = `'${bgFolderId}' in parents and name contains 'background_${type}' and trashed = false`;
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
         {
@@ -591,11 +624,28 @@ export const GoogleDriveService = {
       if (response.ok) {
         const data = await response.json();
         if (data.files && data.files.length > 0) {
-          return `https://drive.google.com/thumbnail?id=${data.files[0].id}&sz=w1920`;
+          return `https://lh3.googleusercontent.com/d/${data.files[0].id}=s1920`;
+        }
+      }
+
+      // Legacy fallback for desktop background
+      if (type === "desktop") {
+        const fallbackQuery = `'${bgFolderId}' in parents and name contains 'background_' and not name contains 'background_mobile' and not name contains 'background_desktop' and trashed = false`;
+        const fallbackRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fallbackQuery)}&fields=files(id)`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData.files && fallbackData.files.length > 0) {
+            return `https://lh3.googleusercontent.com/d/${fallbackData.files[0].id}=s1920`;
+          }
         }
       }
     } catch (e) {
-      console.warn("Failed to sync background from Drive:", e);
+      console.warn(`Failed to sync ${type} background from Drive:`, e);
     }
     return null;
   },

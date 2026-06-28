@@ -146,7 +146,10 @@ export const AddEventView: React.FC = () => {
 
     const handleScroll = () => {
       let currentScrollTop = 0;
-      if (scrollContainer && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+      if (
+        scrollContainer &&
+        scrollContainer.scrollHeight > scrollContainer.clientHeight
+      ) {
         currentScrollTop = scrollContainer.scrollTop;
       } else {
         currentScrollTop = window.scrollY || document.documentElement.scrollTop;
@@ -162,7 +165,9 @@ export const AddEventView: React.FC = () => {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     if (scrollContainer) {
-      scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+      scrollContainer.addEventListener("scroll", handleScroll, {
+        passive: true,
+      });
     }
 
     const observer = new IntersectionObserver(
@@ -187,7 +192,7 @@ export const AddEventView: React.FC = () => {
       {
         threshold: 0.05,
         rootMargin: "0px 0px -40px 0px",
-      }
+      },
     );
 
     const rows = document.querySelectorAll(".timeline-row");
@@ -515,8 +520,8 @@ export const AddEventView: React.FC = () => {
         <div style={{ marginBottom: "20px" }}>
           <h2
             style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 700,
+              fontFamily: "'RobotoSlab', serif",
+              fontWeight: 500,
               fontSize: "20px",
               color: "var(--text)",
             }}
@@ -527,7 +532,10 @@ export const AddEventView: React.FC = () => {
             style={{
               fontSize: "12px",
               color: "var(--text-muted)",
-              marginTop: "2px",
+              marginTop: "4px",
+              fontFamily: "'PlaywriteAUTAS', cursive",
+              lineHeight: 1.6,
+              letterSpacing: "0.5px",
             }}
           >
             Lưu giữ những chuyến đi và kỉ niệm ngọt ngào
@@ -608,11 +616,14 @@ export const AddEventView: React.FC = () => {
 
                         {/* Cute Time Font */}
                         <div className="timeline-time-cute">
-                          <WordSlideUp text={"📅 " + formatDateTime(item.time)} />
+                          <WordSlideUp
+                            text={"📅 " + formatDateTime(item.time)}
+                          />
                         </div>
 
                         {/* Dating category type badge */}
                         <div
+                          className="timeline-category-badge"
                           style={{
                             backgroundColor: "var(--primary-light)",
                             color: "var(--primary-dark)",
@@ -729,7 +740,7 @@ export const AddEventView: React.FC = () => {
               <button
                 onClick={handleLoadMore}
                 style={{
-                  width: "100%",
+                  width: "30%",
                   padding: "12px",
                   backgroundColor: "var(--surface)",
                   border: "1px solid var(--border)",
@@ -738,9 +749,10 @@ export const AddEventView: React.FC = () => {
                   fontWeight: 600,
                   color: "var(--primary-dark)",
                   marginTop: "20px",
+                  alignSelf: "center",
                 }}
               >
-                Xem thêm lịch sử hẹn hò
+                Xem thêm... ❤️
               </button>
             )}
           </>
@@ -952,7 +964,7 @@ export const AddEventView: React.FC = () => {
                           color: "var(--text)",
                         }}
                       >
-                        Dịp / Lý do diễn ra (VD: Kỉ niệm 100 ngày...)
+                        Dịp (VD: Kỉ niệm 100 ngày...)
                       </label>
                       <input
                         type="text"
@@ -1294,7 +1306,7 @@ export const AddEventView: React.FC = () => {
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
-              padding: "20px 0",
+              padding: "12px 0",
               animation: "fadeIn 0.2s ease-out",
             }}
             onClick={handleCloseViewer}
@@ -1432,8 +1444,8 @@ export const AddEventView: React.FC = () => {
                 }}
                 onTouchEnd={handleDragEnd}
                 style={{
-                  maxWidth: "90vw",
-                  maxHeight: "70vh",
+                  maxWidth: "100vw",
+                  maxHeight: "80vh",
                   objectFit: "contain",
                   userSelect: "none",
                   cursor:
@@ -1508,7 +1520,7 @@ export const AddEventView: React.FC = () => {
                 alignItems: "center",
                 gap: "16px",
                 zIndex: 1000,
-                paddingBottom: "10px",
+                paddingTop: "16px",
               }}
               onClick={(e) => e.stopPropagation()}
             >

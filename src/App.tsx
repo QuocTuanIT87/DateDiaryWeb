@@ -6,31 +6,31 @@ import { AddEventView } from "./screens/AddEventView";
 import { ProfileView } from "./screens/ProfileView";
 import { SettingsView } from "./screens/SettingsView";
 import { EditProfileView } from "./screens/EditProfileView";
-import { getDurationSince } from "./utils/dateUtils";
 import { GoogleDriveService } from "./services/GoogleDriveService";
 import { LazyImage } from "./components/LazyImage";
 import { SecureStorage } from "./utils/encryption";
 import { SecurityGate } from "./components/SecurityGate";
 
 import {
-  IoJournalOutline,
-  IoJournal,
+  IoBookOutline,
+  IoBook,
   IoHeartOutline,
   IoHeart,
   IoSettingsOutline,
   IoSettings,
 } from "react-icons/io5";
 
-import { AsyncStorageService } from "./services/AsyncStorageService";
+import twoHeartsIcon from "./assets/images/two-hearts.png";
+import heartGif from "./assets/gif/heart.gif";
 
 type TabType = "diary" | "profile" | "settings";
 type SubViewType = null | { type: "edit-profile"; userId: string };
 
 const MainAppContent: React.FC = () => {
-  const { users, isLoading, backgroundImage } = useApp();
+  const { users, isLoading, backgroundImageDesktop, backgroundImageMobile } =
+    useApp();
   const [activeTab, setActiveTab] = useState<TabType>("diary");
   const [subView, setSubView] = useState<SubViewType>(null);
-  const [daysTogether, setDaysTogether] = useState<number>(0);
 
   // Security Gate State
   const [isSecured, setIsSecured] = useState<boolean>(() => {
@@ -61,21 +61,54 @@ const MainAppContent: React.FC = () => {
     return false;
   });
 
-  // Live anniversary counter in the footer
+  // Auto Backup to Google Drive (once a day)
   useEffect(() => {
-    if (!users || users.length < 2) return;
+    // Only run when users are loaded, onboarding is completed, and security gate is passed
+    if (!isSecured || !users || users.length < 2) return;
 
-    // Calculate days count
-    const startTime = AsyncStorageService.getStartTime();
-    const duration = getDurationSince(startTime.acquaintedDay);
-    setDaysTogether(duration.days);
+    const autoBackup = async () => {
+      try {
+        const loggedIn = await GoogleDriveService.isLoggedIn();
+        if (!loggedIn) return;
 
-    const interval = setInterval(() => {
-      setDaysTogether(getDurationSince(startTime.acquaintedDay).days);
-    }, 60000);
+        // Check if backed up today
+        const lastBackupDate = SecureStorage.getItem(
+          "@fireheart_last_backup_date",
+        );
+        const today = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
 
-    return () => clearInterval(interval);
-  }, [users]);
+        if (lastBackupDate === today) {
+          console.log("[AutoBackup] Data has already been backed up today.");
+          return;
+        }
+
+        console.log("[AutoBackup] Starting daily automatic backup...");
+        const result = await GoogleDriveService.performBackup();
+        console.log(
+          `[AutoBackup] Successfully backed up to ${result.fileName} (Total backups seen: ${result.totalBackups}, deleted: ${result.deletedCount})`,
+        );
+
+        // Update the last backup date in storage
+        SecureStorage.setItem("@fireheart_last_backup_date", today);
+      } catch (err) {
+        console.error("[AutoBackup] Failed to run automated backup:", err);
+      }
+    };
+
+    autoBackup();
+  }, [isSecured, users]);
+
+  // Dynamic body background color based on custom backgrounds existence
+  useEffect(() => {
+    const hasBg = !!(backgroundImageDesktop || backgroundImageMobile);
+    if (!hasBg) {
+      document.body.style.backgroundColor = "transparent";
+      document.documentElement.style.backgroundColor = "transparent";
+    } else {
+      document.body.style.backgroundColor = "";
+      document.documentElement.style.backgroundColor = "";
+    }
+  }, [backgroundImageDesktop, backgroundImageMobile]);
 
   // 1. Loading State Screen
   if (isLoading) {
@@ -87,7 +120,10 @@ const MainAppContent: React.FC = () => {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          backgroundColor: "var(--background)",
+          backgroundColor:
+            backgroundImageDesktop || backgroundImageMobile
+              ? "var(--background)"
+              : "transparent",
           gap: "16px",
         }}
       >
@@ -147,12 +183,20 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  const activeBgDesktop = backgroundImageDesktop
+    ? GoogleDriveService.resolveDriveUrl(backgroundImageDesktop, 1920)
+    : null;
+  const activeBgMobile = backgroundImageMobile
+    ? GoogleDriveService.resolveDriveUrl(backgroundImageMobile, 1920)
+    : null;
+
   return (
     <div className="main-wrapper">
-      {backgroundImage && (
+      {activeBgDesktop && (
         <img
-          src={backgroundImage}
+          src={activeBgDesktop}
           referrerPolicy="no-referrer"
+          className="desktop-bg-img"
           style={{
             position: "fixed",
             top: 0,
@@ -160,7 +204,22 @@ const MainAppContent: React.FC = () => {
             width: "100vw",
             height: "100vh",
             objectFit: "cover",
-            zIndex: -10,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {activeBgMobile && (
+        <img
+          src={activeBgMobile}
+          referrerPolicy="no-referrer"
+          className="mobile-bg-img"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            objectFit: "cover",
             pointerEvents: "none",
           }}
         />
@@ -175,19 +234,23 @@ const MainAppContent: React.FC = () => {
             }
             alt="Boy avatar"
             style={{
-              width: "36px",
-              height: "36px",
+              width: "46px",
+              height: "46px",
               borderRadius: "50%",
               border: "2px solid var(--accent)",
               objectFit: "cover",
             }}
           />
-          <span
-            style={{ fontSize: "16px", color: "var(--accent)" }}
-            className="animate-heartbeat"
-          >
-            ❤️
-          </span>
+          <img
+            src={heartGif}
+            alt="Heart animation"
+            style={{
+              width: "36px",
+              height: "36px",
+              objectFit: "contain",
+              margin: "0 2px",
+            }}
+          />
           <LazyImage
             src={
               GoogleDriveService.resolveDriveUrl(girlUser?.avatar) ||
@@ -195,37 +258,13 @@ const MainAppContent: React.FC = () => {
             }
             alt="Girl avatar"
             style={{
-              width: "36px",
-              height: "36px",
+              width: "46px",
+              height: "46px",
               borderRadius: "50%",
               border: "2px solid var(--primary)",
               objectFit: "cover",
             }}
           />
-        </div>
-        <div
-          style={{
-            width: "1px",
-            height: "20px",
-            backgroundColor: "var(--border)",
-            margin: "0 4px",
-          }}
-        ></div>
-        <div
-          style={{ fontSize: "13px", fontWeight: 700, color: "var(--text)" }}
-        >
-          Bên nhau:{" "}
-          <span
-            style={{
-              color: "var(--accent)",
-              fontFamily: "var(--font-display)",
-              fontSize: "16px",
-              fontWeight: 800,
-            }}
-          >
-            {daysTogether}
-          </span>{" "}
-          ngày
         </div>
       </div>
 
@@ -234,34 +273,43 @@ const MainAppContent: React.FC = () => {
         {/* Brand Header (No background, text only) */}
         <div
           style={{
-            padding: "24px 0",
             display: "flex",
             flexDirection: "column",
             gap: "4px",
             pointerEvents: "auto",
           }}
         >
-          <h1
-            style={{
-              fontSize: "20px",
-              fontWeight: 850,
-              fontFamily: "var(--font-display)",
-              color: "var(--text)",
-              margin: 0,
-            }}
-          >
-            Two Hearts
-          </h1>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "var(--text-muted)",
-              fontWeight: 600,
-              letterSpacing: "0.5px",
-            }}
-          >
-            Nhật ký hẹn hò
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <img
+              src={twoHeartsIcon}
+              alt="Two Hearts Logo"
+              style={{ width: "80px", height: "80px", objectFit: "contain" }}
+            />
+            <div>
+              <h1
+                style={{
+                  fontSize: "28px", // LilitaOne looks better slightly larger
+                  fontWeight: 400, // LilitaOne is a display font, works best with normal weight
+                  fontFamily: "'LilitaOne', cursive",
+                  color: "var(--text)",
+                  margin: 0,
+                }}
+              >
+                Two Hearts
+              </h1>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "var(--text-muted)",
+                  fontFamily: "'PlaywriteAUTAS', cursive",
+                  lineHeight: 1.6,
+                  marginTop: "4px",
+                }}
+              >
+                Nhật ký hẹn hò
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Navigation Tabs (3 separate circular buttons) */}
@@ -284,9 +332,9 @@ const MainAppContent: React.FC = () => {
             title="Nhật ký"
           >
             {activeTab === "diary" && !subView ? (
-              <IoJournal size={20} />
+              <IoBook size={20} />
             ) : (
-              <IoJournalOutline size={20} />
+              <IoBookOutline size={20} />
             )}
           </button>
 
@@ -326,18 +374,22 @@ const MainAppContent: React.FC = () => {
 
       {/* MOBILE TOP NAVIGATION BAR */}
       <div className="mobile-header">
-        <span style={{ fontSize: "20px" }}>💖</span>
+        <img
+          src={twoHeartsIcon}
+          alt="Two Hearts Logo"
+          style={{ width: "24px", height: "24px", objectFit: "contain" }}
+        />
         <span
           style={{
-            fontSize: "15px",
-            fontWeight: 800,
-            fontFamily: "var(--font-display)",
+            fontSize: "18px", // LilitaOne works better slightly larger
+            fontWeight: 400,
+            fontFamily: "'LilitaOne', cursive",
             color: "var(--text)",
           }}
         >
           Two Hearts
         </span>
-        <div style={{ width: "20px" }}></div> {/* balance item placeholder */}
+        <div style={{ width: "24px" }}></div> {/* balance item placeholder */}
       </div>
 
       {/* SCROLLABLE MAIN CONTENT AREA */}
@@ -351,103 +403,43 @@ const MainAppContent: React.FC = () => {
             setActiveTab("diary");
             setSubView(null);
           }}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            color:
-              activeTab === "diary" && !subView
-                ? "var(--primary-dark)"
-                : "var(--text-muted)",
-            width: "60px",
-            height: "100%",
-            gap: "4px",
-          }}
+          className={`mobile-bottom-btn diary-btn ${activeTab === "diary" && !subView ? "active" : ""}`}
         >
           {activeTab === "diary" && !subView ? (
-            <IoJournal size={22} />
+            <IoBook size={22} />
           ) : (
-            <IoJournalOutline size={22} />
+            <IoBookOutline size={22} />
           )}
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: activeTab === "diary" && !subView ? 600 : 500,
-            }}
-          >
-            Nhật ký
-          </span>
         </button>
 
-        {/* Tab 3: Profile */}
+        {/* Tab 2: Profile */}
         <button
           onClick={() => {
             setActiveTab("profile");
             setSubView(null);
           }}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            color:
-              activeTab === "profile" && !subView
-                ? "var(--accent)"
-                : "var(--text-muted)",
-            width: "60px",
-            height: "100%",
-            gap: "4px",
-          }}
+          className={`mobile-bottom-btn profile-btn ${activeTab === "profile" && !subView ? "active" : ""}`}
         >
           {activeTab === "profile" && !subView ? (
-            <IoHeart size={24} color="var(--accent)" />
+            <IoHeart size={24} />
           ) : (
             <IoHeartOutline size={22} />
           )}
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: activeTab === "profile" && !subView ? 600 : 500,
-            }}
-          >
-            Hồ sơ
-          </span>
         </button>
 
-        {/* Tab 4: Settings */}
+        {/* Tab 3: Settings */}
         <button
           onClick={() => {
             setActiveTab("settings");
             setSubView(null);
           }}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            color:
-              activeTab === "settings" && !subView
-                ? "var(--primary-dark)"
-                : "var(--text-muted)",
-            width: "60px",
-            height: "100%",
-            gap: "4px",
-          }}
+          className={`mobile-bottom-btn settings-btn ${activeTab === "settings" && !subView ? "active" : ""}`}
         >
           {activeTab === "settings" && !subView ? (
             <IoSettings size={22} />
           ) : (
             <IoSettingsOutline size={22} />
           )}
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: activeTab === "settings" && !subView ? 600 : 500,
-            }}
-          >
-            Cài đặt
-          </span>
         </button>
       </div>
 
@@ -455,7 +447,7 @@ const MainAppContent: React.FC = () => {
       <style>{`
         /* Sidebar styles on desktop */
         .desktop-sidebar {
-          width: 260px;
+          width: 280px;
           height: 100vh;
           background-color: transparent;
           display: flex;
@@ -503,13 +495,111 @@ const MainAppContent: React.FC = () => {
           z-index: 850;
           display: flex;
           align-items: center;
-          gap: 12px;
-          background-color: var(--glass-bg);
+          background-color: var(--surface);
           backdrop-filter: blur(10px);
           border: 1px solid var(--border);
           padding: 8px 16px;
           border-radius: var(--radius-full);
-          box-shadow: 0 4px 12px rgba(85, 150, 224, 0.04);
+          box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15);
+          animation: pill-heartbeat-shadow 3.6s infinite ease-in-out;
+        }
+
+        @keyframes pill-heartbeat-shadow {
+          /* Fast Beat 1 */
+          0% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0.4), 0 0 0 0px rgba(85, 150, 224, 0.2);
+          }
+          3% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          6% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          11.1% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+
+          /* Fast Beat 2 */
+          14.1% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          17.1% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          22.2% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+
+          /* Fast Beat 3 */
+          25.2% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          28.2% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          33.3% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+
+          /* Slow Beat 1 */
+          38.8% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          44.4% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          55.5% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+
+          /* Slow Beat 2 */
+          61.1% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          66.6% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          77.7% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+
+          /* Slow Beat 3 */
+          83.3% {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(85, 150, 224, 0.3), 0 0 0 12px rgba(85, 150, 224, 0.25), 0 0 0 24px rgba(85, 150, 224, 0.12);
+          }
+          88.8% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 24px rgba(85, 150, 224, 0), 0 0 0 48px rgba(85, 150, 224, 0);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.15), 0 0 0 0px rgba(85, 150, 224, 0), 0 0 0 0px rgba(85, 150, 224, 0);
+          }
+        }
+
+        .desktop-bg-img {
+          display: block;
+        }
+
+        .mobile-bg-img {
+          display: none;
         }
 
         /* Content space offset for fixed sidebar */
@@ -517,7 +607,8 @@ const MainAppContent: React.FC = () => {
           flex: 1;
           height: 100vh;
           overflow-y: auto;
-          margin-left: 260px;
+          overflow-x: hidden;
+          margin-left: 280px;
           display: flex;
           flex-direction: column;
         }
@@ -532,48 +623,82 @@ const MainAppContent: React.FC = () => {
 
         /* Screen widths adaptations */
         @media (max-width: 768px) {
+          .desktop-bg-img {
+            display: none !important;
+          }
+          .mobile-bg-img {
+            display: block !important;
+          }
           .desktop-sidebar {
             display: none !important;
           }
           .desktop-together-pill {
-            display: none !important;
+            display: flex !important;
+            top: 12px !important;
+            left: 0 !important;
+            right: 0 !important;
+            margin: 0 auto !important;
+            width: max-content !important;
+            z-index: 900 !important;
           }
           .main-content-scroll {
             margin-left: 0 !important;
             height: auto !important;
             overflow-y: visible !important;
-            padding-top: 56px;
+            overflow-x: hidden !important;
+            padding-top: 76px !important;
             padding-bottom: 74px;
           }
           .mobile-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background-color: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 16px;
-            z-index: 800;
+            display: none !important;
           }
           .mobile-bottom-bar {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 64px;
-            background-color: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid var(--border);
+            height: 74px;
+            background-color: transparent;
+            backdrop-filter: none;
+            border-top: none;
             display: flex;
             justify-content: space-around;
             align-items: center;
             z-index: 800;
-            box-shadow: 0 -4px 12px rgba(85, 150, 224, 0.04);
+            box-shadow: none;
+            pointer-events: none;
+            padding-bottom: env(safe-area-inset-bottom);
+          }
+          .mobile-bottom-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            color: var(--text-muted);
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            transition: all var(--transition-fast);
+            pointer-events: auto;
+          }
+          .mobile-bottom-btn:active {
+            transform: scale(0.9);
+          }
+          .mobile-bottom-btn.active.diary-btn,
+          .mobile-bottom-btn.active.settings-btn {
+            background-color: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(85, 150, 224, 0.35);
+          }
+          .mobile-bottom-btn.active.profile-btn {
+            background-color: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(243, 104, 224, 0.35);
           }
         }
       `}</style>

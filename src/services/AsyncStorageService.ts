@@ -373,32 +373,48 @@ export const AsyncStorageService = {
     };
   },
 
-  async getBackgroundUrl(): Promise<string | null> {
+  async getBackgroundUrl(type: "desktop" | "mobile"): Promise<string | null> {
     try {
-      const snapshot = await get(dbRef("/background"));
+      const snapshot = await get(dbRef(`/background_${type}`));
       const val = snapshot.val();
-      if (!val) return null;
-      if (typeof val === "string") {
-        const decrypted = decrypt(val);
-        return decrypted || val;
+      if (val) {
+        if (typeof val === "string") {
+          const decrypted = decrypt(val);
+          return decrypted || val;
+        }
+        return null;
+      }
+
+      // Fallback & Auto-migration for legacy desktop background
+      if (type === "desktop") {
+        const legacySnapshot = await get(dbRef("/background"));
+        const legacyVal = legacySnapshot.val();
+        if (legacyVal && typeof legacyVal === "string") {
+          const decrypted = decrypt(legacyVal);
+          const bgUrl = decrypted || legacyVal;
+          // Migrate to background_desktop and delete old key
+          await set(dbRef("/background_desktop"), legacyVal);
+          await remove(dbRef("/background"));
+          return bgUrl;
+        }
       }
       return null;
     } catch (error) {
-      console.error("Firebase getBackgroundUrl failed:", error);
+      console.error(`Firebase getBackgroundUrl for ${type} failed:`, error);
       return null;
     }
   },
 
-  async setBackgroundUrl(url: string | null): Promise<void> {
+  async setBackgroundUrl(type: "desktop" | "mobile", url: string | null): Promise<void> {
     try {
       if (url === null) {
-        await remove(dbRef("/background"));
+        await remove(dbRef(`/background_${type}`));
       } else {
         const encrypted = encrypt(url);
-        await set(dbRef("/background"), encrypted);
+        await set(dbRef(`/background_${type}`), encrypted);
       }
     } catch (error) {
-      console.error("Firebase setBackgroundUrl failed:", error);
+      console.error(`Firebase setBackgroundUrl for ${type} failed:`, error);
       throw error;
     }
   },
