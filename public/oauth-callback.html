@@ -49,12 +49,13 @@
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.substring(1));
     const token = params.get("access_token");
+    const expiresIn = params.get("expires_in");
     const error = params.get("error");
 
     if (window.opener) {
       if (token) {
         window.opener.postMessage(
-          { type: "GOOGLE_OAUTH_TOKEN", token: token },
+          { type: "GOOGLE_OAUTH_TOKEN", token: token, expiresIn: expiresIn },
           window.location.origin
         );
       } else {

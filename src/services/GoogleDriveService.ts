@@ -37,7 +37,7 @@ export const GoogleDriveService = {
     if (expiryStr) {
       const expiry = parseInt(expiryStr, 10);
       if (!isNaN(expiry) && expiry < Date.now()) {
-        console.log("Google session expired after 3 days. Logging out...");
+        console.log("Google session expired. Logging out...");
         await this.logoutGoogle();
         return null;
       }
@@ -45,10 +45,10 @@ export const GoogleDriveService = {
     return token;
   },
 
-  async saveAccessToken(token: string): Promise<void> {
+  async saveAccessToken(token: string, expiresInSeconds?: number): Promise<void> {
     SecureStorage.setItem(GOOGLE_TOKEN_KEY, token);
-    // Set expiration to 3 days from now
-    const expiryTime = Date.now() + 3 * 24 * 60 * 60 * 1000;
+    const seconds = expiresInSeconds && !isNaN(expiresInSeconds) ? expiresInSeconds : 3600;
+    const expiryTime = Date.now() + seconds * 1000;
     SecureStorage.setItem(GOOGLE_TOKEN_EXPIRY_KEY, expiryTime.toString());
   },
 
@@ -108,7 +108,8 @@ export const GoogleDriveService = {
           clearInterval(checkClosed);
 
           const token = event.data.token;
-          await this.saveAccessToken(token);
+          const expiresIn = event.data.expiresIn ? parseInt(event.data.expiresIn, 10) : undefined;
+          await this.saveAccessToken(token, expiresIn);
 
           try {
             const userInfo = await this.getGoogleUserInfo();
@@ -366,54 +367,76 @@ export const GoogleDriveService = {
   async getOrCreateDriveFolder(folderName: string, token: string, parentId?: string): Promise<string> {
     const cacheKey = `${folderName}_${parentId || "root"}`;
     if (folderPromises[cacheKey]) {
-      return folderPromises[cacheKey];
+      return folderPromises[cacheKey]!;
     }
 
     const promise = (async () => {
-      let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-      if (parentId) {
-        query += ` and '${parentId}' in parents`;
-      } else {
-        query += ` and 'root' in parents`;
-      }
-      const checkRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      try {
+        let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+        if (parentId) {
+          query += ` and '${parentId}' in parents`;
+        } else {
+          query += ` and 'root' in parents`;
         }
-      );
+        const checkRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
 
-      if (checkRes.ok) {
+        if (!checkRes.ok) {
+          let checkErr = "";
+          try {
+            const errData = await checkRes.json();
+            checkErr = errData?.error?.message || JSON.stringify(errData);
+          } catch (_) {
+            checkErr = checkRes.statusText;
+          }
+          throw new Error(`Kiểm tra thư mục thất bại: ${checkErr}`);
+        }
+
         const data = await checkRes.json();
         if (data.files && data.files.length > 0) {
           return data.files[0].id;
         }
+
+        // Create folder
+        const body: any = {
+          name: folderName,
+          mimeType: "application/vnd.google-apps.folder",
+        };
+        if (parentId) {
+          body.parents = [parentId];
+        }
+
+        const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!createRes.ok) {
+          let createErr = "";
+          try {
+            const errData = await createRes.json();
+            createErr = errData?.error?.message || JSON.stringify(errData);
+          } catch (_) {
+            createErr = createRes.statusText;
+          }
+          throw new Error(`Không thể tạo thư mục ${folderName} trên Google Drive. Chi tiết: ${createErr}`);
+        }
+
+        const createData = await createRes.json();
+        return createData.id;
+      } catch (error) {
+        // Clear from cache on failure so we can retry later
+        delete folderPromises[cacheKey];
+        throw error;
       }
-
-      // Create folder
-      const body: any = {
-        name: folderName,
-        mimeType: "application/vnd.google-apps.folder",
-      };
-      if (parentId) {
-        body.parents = [parentId];
-      }
-
-      const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!createRes.ok) {
-        throw new Error(`Không thể tạo thư mục ${folderName} trên Google Drive.`);
-      }
-
-      const data = await createRes.json();
-      return data.id;
     })();
 
     folderPromises[cacheKey] = promise;

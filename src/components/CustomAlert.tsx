@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   IoCheckmarkCircleOutline, 
   IoAlertCircleOutline, 
@@ -148,7 +149,7 @@ export const CustomAlertProvider: React.FC = () => {
     ? config.buttons 
     : [{ text: "OK" }];
 
-  return (
+  return createPortal(
     <div 
       style={{
         position: "fixed",
@@ -156,7 +157,7 @@ export const CustomAlertProvider: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 9999,
+        zIndex: 99999,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -266,6 +267,7 @@ export const CustomAlertProvider: React.FC = () => {
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
