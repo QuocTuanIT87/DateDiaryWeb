@@ -553,10 +553,11 @@ export const GoogleDriveService = {
     }
   },
 
-  getFileIdFromUrl(url: string): string | null {
-    // Pattern: https://lh3.googleusercontent.com/d/[FILE_ID]=s800
-    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
+  getFileIdFromUrl(url: string | undefined | null): string | null {
+    if (!url) return null;
+    // Match either /d/[FILE_ID] or ?id=[FILE_ID] / &id=[FILE_ID]
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return match && match[1] ? match[1] : null;
   },
 
   resolveDriveUrl(url: string | undefined | null, size: number = 800): string {
