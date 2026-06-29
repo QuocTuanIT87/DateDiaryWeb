@@ -472,40 +472,42 @@ export const AddEventView: React.FC = () => {
       style={{ paddingBottom: "70px", flex: 1 }}
     >
       {/* Loading Overlay */}
-      {loading && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(248, 251, 254, 0.7)",
-            zIndex: 900,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "24px",
-            textAlign: "center",
-          }}
-        >
-          <div className="spinner"></div>
-          {uploadingImage && (
-            <p
-              style={{
-                fontSize: "14px",
-                color: "var(--primary-dark)",
-                marginTop: "12px",
-                maxWidth: "280px",
-              }}
-            >
-              Upload ảnh chất lượng cao lên Google Drive đang được xử lý. Vui
-              lòng chờ...
-            </p>
-          )}
-        </div>
-      )}
+      {loading &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(248, 251, 254, 0.7)",
+              zIndex: 99999,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "24px",
+              textAlign: "center",
+            }}
+          >
+            <div className="spinner"></div>
+            {uploadingImage && (
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "var(--primary-dark)",
+                  marginTop: "12px",
+                  maxWidth: "280px",
+                }}
+              >
+                Upload ảnh chất lượng cao lên Google Drive đang được xử lý. Vui
+                lòng chờ...
+              </p>
+            )}
+          </div>,
+          document.body
+        )}
 
       <div
         style={{
