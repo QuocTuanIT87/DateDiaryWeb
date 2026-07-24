@@ -19,6 +19,8 @@ import {
   IoTrashOutline,
   IoCreateOutline,
   IoRefreshOutline,
+  IoCalendarOutline,
+  IoFunnelOutline,
 } from "react-icons/io5";
 import { MdZoomIn, MdZoomOut } from "react-icons/md";
 
@@ -65,6 +67,54 @@ export const AddEventView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
 
+  // Date Range Filter Active State
+  const [filterStartDate, setFilterStartDate] = useState<string>("");
+  const [filterEndDate, setFilterEndDate] = useState<string>("");
+
+  // Date Range Filter Modal State
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [tempStartDate, setTempStartDate] = useState<string>("");
+  const [tempEndDate, setTempEndDate] = useState<string>("");
+
+  const handleOpenFilterModal = () => {
+    setTempStartDate(filterStartDate);
+    setTempEndDate(filterEndDate);
+    setShowFilterModal(true);
+  };
+
+  const handleApplyFilterModal = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setFilterStartDate(tempStartDate);
+    setFilterEndDate(tempEndDate);
+    setShowFilterModal(false);
+  };
+
+  const handleClearFilter = () => {
+    setFilterStartDate("");
+    setFilterEndDate("");
+    setTempStartDate("");
+    setTempEndDate("");
+  };
+
+  // Derived filtered history sorted in descending order of time
+  const filteredAllHistory = React.useMemo(() => {
+    if (!filterStartDate && !filterEndDate) {
+      return allHistory;
+    }
+
+    const startMs = filterStartDate
+      ? new Date(`${filterStartDate}T00:00:00`).getTime()
+      : -Infinity;
+    const endMs = filterEndDate
+      ? new Date(`${filterEndDate}T23:59:59.999`).getTime()
+      : Infinity;
+
+    return allHistory.filter((item) => {
+      const itemMs = new Date(item.time).getTime();
+      return itemMs >= startMs && itemMs <= endMs;
+    });
+  }, [allHistory, filterStartDate, filterEndDate]);
+
   // Form states
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,6 +147,11 @@ export const AddEventView: React.FC = () => {
 
   // Reference for file input
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync displayed history slice whenever filteredAllHistory or displayLimit changes
+  useEffect(() => {
+    setHistory(filteredAllHistory.slice(0, displayLimit));
+  }, [filteredAllHistory, displayLimit]);
 
   // Load category and history list
   const loadData = async (preserveLimit = false) => {
@@ -208,10 +263,10 @@ export const AddEventView: React.FC = () => {
   }, [history]);
 
   const handleLoadMore = () => {
-    if (history.length >= allHistory.length) return;
+    if (history.length >= filteredAllHistory.length) return;
     const newLimit = displayLimit + 20;
     setDisplayLimit(newLimit);
-    setHistory(allHistory.slice(0, newLimit));
+    setHistory(filteredAllHistory.slice(0, newLimit));
   };
 
   // Image Drag / Pan Handlers
@@ -240,6 +295,50 @@ export const AddEventView: React.FC = () => {
     setPanOffset({ x: 0, y: 0 });
     setIsDragging(false);
   };
+
+  const handlePrevImage = () => {
+    setViewerIndex((prev) => {
+      setZoomScale(1);
+      setRotateDegree(0);
+      setPanOffset({ x: 0, y: 0 });
+      setIsDragging(false);
+      return prev === 0 ? viewerImages.length - 1 : prev - 1;
+    });
+  };
+
+  const handleNextImage = () => {
+    setViewerIndex((prev) => {
+      setZoomScale(1);
+      setRotateDegree(0);
+      setPanOffset({ x: 0, y: 0 });
+      setIsDragging(false);
+      return prev === viewerImages.length - 1 ? 0 : prev + 1;
+    });
+  };
+
+  // Keyboard navigation for Lightbox Viewer (ArrowLeft, ArrowRight, Escape)
+  useEffect(() => {
+    if (!showViewer) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCloseViewer();
+      } else if (e.key === "ArrowLeft") {
+        if (viewerImages.length > 1) {
+          handlePrevImage();
+        }
+      } else if (e.key === "ArrowRight") {
+        if (viewerImages.length > 1) {
+          handleNextImage();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showViewer, viewerImages.length]);
 
   // Image Selection
   const handleTriggerFileInput = () => {
@@ -506,7 +605,7 @@ export const AddEventView: React.FC = () => {
               </p>
             )}
           </div>,
-          document.body
+          document.body,
         )}
 
       <div
@@ -519,17 +618,62 @@ export const AddEventView: React.FC = () => {
         }}
       >
         {/* Main Title Header */}
-        <div style={{ marginBottom: "20px" }}>
-          <h2
+        <div
+          style={{
+            marginBottom: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+          }}
+        >
+          <div
             style={{
-              fontFamily: "'RobotoSlab', serif",
-              fontWeight: 500,
-              fontSize: "20px",
-              color: "var(--text)",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
             }}
           >
-            Nhật ký khoảnh khắc 📖
-          </h2>
+            <h2
+              style={{
+                fontFamily: "'RobotoSlab', serif",
+                fontWeight: 500,
+                fontSize: "20px",
+                color: "var(--text)",
+                margin: 0,
+              }}
+            >
+              Nhật ký khoảnh khắc 📖
+            </h2>
+
+            {/* Filter Trigger Button & X Clear Button */}
+            {allHistory.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  onClick={handleOpenFilterModal}
+                  className={`filter-trigger-btn ${(filterStartDate || filterEndDate) ? "active" : ""}`}
+                  title="Lọc theo khoảng thời gian"
+                >
+                  <IoFunnelOutline size={14} />
+                  <span>Lọc</span>
+                  {(filterStartDate || filterEndDate) && (
+                    <span className="filter-badge-dot" />
+                  )}
+                </button>
+
+                {(filterStartDate || filterEndDate) && (
+                  <button
+                    onClick={handleClearFilter}
+                    className="filter-clear-x-btn"
+                    title="Xóa điều kiện lọc"
+                  >
+                    <IoCloseOutline size={18} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <p
             style={{
               fontSize: "12px",
@@ -541,6 +685,11 @@ export const AddEventView: React.FC = () => {
             }}
           >
             Lưu giữ những chuyến đi và kỉ niệm ngọt ngào
+            {(filterStartDate || filterEndDate) && (
+              <span style={{ marginLeft: "10px", color: "var(--primary-dark)", fontWeight: 600 }}>
+                (Đang lọc: {filteredAllHistory.length}/{allHistory.length} kỉ niệm)
+              </span>
+            )}
           </p>
         </div>
 
@@ -579,6 +728,53 @@ export const AddEventView: React.FC = () => {
               Click biểu tượng nút "+" phía bên dưới để lưu giữ dấu ấn hẹn hò
               đầu tiên nhé!
             </p>
+          </div>
+        ) : filteredAllHistory.length === 0 ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "40px 20px",
+              textAlign: "center",
+              color: "var(--text-muted)",
+              backgroundColor: "var(--glass-bg)",
+              backdropFilter: "blur(8px)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--border)",
+              margin: "20px 0",
+            }}
+          >
+            <span style={{ fontSize: "42px", marginBottom: "12px" }}>🙈</span>
+            <p
+              style={{
+                fontSize: "14px",
+                color: "var(--text)",
+                fontWeight: 500,
+                fontFamily: "'PlaywriteAUTAS', cursive",
+                lineHeight: 1.6,
+                maxWidth: "360px",
+              }}
+            >
+              Oops ! Không tìm thấy khoảnh khắc nào trong khoảng thời gian này, hihi
+            </p>
+            <button
+              onClick={handleClearFilter}
+              style={{
+                marginTop: "16px",
+                padding: "8px 18px",
+                borderRadius: "var(--radius-full)",
+                backgroundColor: "var(--primary-light)",
+                color: "var(--primary-dark)",
+                border: "1px solid var(--primary)",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Xem tất cả kỉ niệm
+            </button>
           </div>
         ) : (
           <>
@@ -1376,13 +1572,7 @@ export const AddEventView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewerIndex((prev) => {
-                      setZoomScale(1);
-                      setRotateDegree(0);
-                      setPanOffset({ x: 0, y: 0 });
-                      setIsDragging(false);
-                      return prev === 0 ? viewerImages.length - 1 : prev - 1;
-                    });
+                    handlePrevImage();
                   }}
                   style={{
                     position: "absolute",
@@ -1470,13 +1660,7 @@ export const AddEventView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewerIndex((prev) => {
-                      setZoomScale(1);
-                      setRotateDegree(0);
-                      setPanOffset({ x: 0, y: 0 });
-                      setIsDragging(false);
-                      return prev === viewerImages.length - 1 ? 0 : prev + 1;
-                    });
+                    handleNextImage();
                   }}
                   style={{
                     position: "absolute",
@@ -1676,6 +1860,176 @@ export const AddEventView: React.FC = () => {
               >
                 <IoRefreshOutline size={20} />
               </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Filter Modal */}
+      {showFilterModal &&
+        createPortal(
+          <div
+            className="filter-modal-overlay"
+            onClick={() => setShowFilterModal(false)}
+          >
+            <div
+              className="filter-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <IoCalendarOutline size={20} color="var(--primary)" />
+                  <h3
+                    style={{
+                      fontSize: "17px",
+                      fontWeight: 700,
+                      color: "var(--text)",
+                      fontFamily: "var(--font-display)",
+                      margin: 0,
+                    }}
+                  >
+                    Lọc theo khoảng thời gian
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowFilterModal(false)}
+                  style={{
+                    padding: "4px",
+                    color: "var(--text-muted)",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <IoCloseOutline size={22} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleApplyFilterModal}
+                style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Từ ngày:
+                  </label>
+                  <input
+                    type="date"
+                    className="date-picker-input"
+                    value={tempStartDate}
+                    onChange={(e) => setTempStartDate(e.target.value)}
+                    max={tempEndDate || undefined}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border)",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Đến ngày:
+                  </label>
+                  <input
+                    type="date"
+                    className="date-picker-input"
+                    value={tempEndDate}
+                    onChange={(e) => setTempEndDate(e.target.value)}
+                    min={tempStartDate || undefined}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border)",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: "10px",
+                    marginTop: "8px",
+                  }}
+                >
+                  {(tempStartDate || tempEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempStartDate("");
+                        setTempEndDate("");
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid #fee2e2",
+                        backgroundColor: "#fef2f2",
+                        color: "#dc2626",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        marginRight: "auto",
+                      }}
+                    >
+                      Xóa nhập
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterModal(false)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border)",
+                      backgroundColor: "var(--surface)",
+                      color: "var(--text)",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: "8px 20px",
+                      borderRadius: "var(--radius-md)",
+                      border: "none",
+                      backgroundColor: "var(--primary)",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+              </form>
             </div>
           </div>,
           document.body,
