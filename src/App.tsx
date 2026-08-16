@@ -6,10 +6,13 @@ import { AddEventView } from "./screens/AddEventView";
 import { ProfileView } from "./screens/ProfileView";
 import { SettingsView } from "./screens/SettingsView";
 import { EditProfileView } from "./screens/EditProfileView";
+import { MilestoneHistoryView } from "./screens/MilestoneHistoryView";
 import { GoogleDriveService } from "./services/GoogleDriveService";
 import { LazyImage } from "./components/LazyImage";
 import { SecureStorage } from "./utils/encryption";
 import { SecurityGate } from "./components/SecurityGate";
+import { DailyPoemTicker } from "./components/DailyPoemTicker";
+import { AsyncStorageService } from "./services/AsyncStorageService";
 
 import {
   IoBookOutline,
@@ -24,7 +27,10 @@ import twoHeartsIcon from "./assets/images/two-hearts.png";
 import heartGif from "./assets/gif/heart.gif";
 
 type TabType = "diary" | "profile" | "settings";
-type SubViewType = null | { type: "edit-profile"; userId: string };
+type SubViewType =
+  | null
+  | { type: "edit-profile"; userId: string }
+  | { type: "milestone-history" };
 
 const MainAppContent: React.FC = () => {
   const { users, isLoading, backgroundImageDesktop, backgroundImageMobile } =
@@ -166,12 +172,24 @@ const MainAppContent: React.FC = () => {
       );
     }
 
+    if (subView && subView.type === "milestone-history") {
+      return (
+        <MilestoneHistoryView
+          acquaintedDateIso={AsyncStorageService.getStartTime().acquaintedDay}
+          onBack={() => setSubView(null)}
+        />
+      );
+    }
+
     switch (activeTab) {
       case "profile":
         return (
           <ProfileView
             onEditProfile={(userId) =>
               setSubView({ type: "edit-profile", userId })
+            }
+            onViewMilestones={() =>
+              setSubView({ type: "milestone-history" })
             }
           />
         );
@@ -191,7 +209,8 @@ const MainAppContent: React.FC = () => {
     : null;
 
   return (
-    <div className="main-wrapper">
+    <div className="main-wrapper" style={{ position: "relative" }}>
+      <DailyPoemTicker />
       {activeBgDesktop && (
         <img
           src={activeBgDesktop}

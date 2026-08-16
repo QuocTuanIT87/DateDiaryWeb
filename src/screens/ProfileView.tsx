@@ -13,6 +13,7 @@ import {
 } from "../utils/dateUtils";
 import { LazyImage } from "../components/LazyImage";
 import { CustomAlert } from "../components/CustomAlert";
+import { MilestoneProfileSection } from "../components/MilestoneProfileSection";
 import {
   IoHeart,
   IoCalendarOutline,
@@ -26,9 +27,10 @@ import {
 
 interface ProfileViewProps {
   onEditProfile: (userId: string) => void;
+  onViewMilestones: () => void;
 }
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile, onViewMilestones }) => {
   const { users, refreshState } = useApp();
   const [milestones, setMilestones] = useState<DateStartTime | null>(null);
   const [duration, setDuration] = useState<DurationDetails>({
@@ -653,6 +655,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEditProfile }) => {
             );
           })}
         </div>
+
+        {/* 100-Day Milestone Section (calculated from acquaintedDay) */}
+        <MilestoneProfileSection
+          acquaintedDateIso={milestones?.acquaintedDay || AsyncStorageService.getStartTime().acquaintedDay}
+          onViewMilestones={onViewMilestones}
+        />
       </div>
     </div>
   );
