@@ -1,15 +1,11 @@
 import React, { useState } from "react";
-import {
-  getActiveAnniversaryBanners,
-} from "../utils/anniversaryUtils";
-import {
-  IoChevronDownOutline,
-  IoChevronUpOutline,
-} from "react-icons/io5";
+import { getActiveAnniversaryBanners } from "../utils/anniversaryUtils";
+import { IoChevronDownOutline, IoChevronUpOutline } from "react-icons/io5";
 
 export const LoveBanner: React.FC = () => {
   // Active anniversaries list toggle state
-  const [showAllAnniversaries, setShowAllAnniversaries] = useState<boolean>(false);
+  const [showAllAnniversaries, setShowAllAnniversaries] =
+    useState<boolean>(false);
 
   // Evaluate active anniversary banners
   const { primaryBanner, allActiveBanners } = getActiveAnniversaryBanners();
@@ -23,11 +19,12 @@ export const LoveBanner: React.FC = () => {
         style={{
           background: primaryBanner.gradientBg,
           borderRadius: "var(--radius-lg)",
-          padding: "16px 20px",
+          padding: "100px 20px",
           color: primaryBanner.textColor,
-          boxShadow: primaryBanner.level === "exact_day"
-            ? "0 12px 28px -6px rgba(255, 20, 147, 0.45)"
-            : "0 8px 20px -4px rgba(0, 0, 0, 0.15)",
+          boxShadow:
+            primaryBanner.level === "exact_day"
+              ? "0 12px 28px -6px rgba(255, 20, 147, 0.45)"
+              : "0 8px 20px -4px rgba(0, 0, 0, 0.15)",
           position: "relative",
           overflow: "hidden",
           transition: "all 0.3s ease",
@@ -43,20 +40,41 @@ export const LoveBanner: React.FC = () => {
               right: 0,
               bottom: 0,
               pointerEvents: "none",
-              background: "radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%)",
               animation: "pulse 2s infinite alternate",
             }}
           />
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "32px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}>
+            <span
+              style={{
+                fontSize: "32px",
+                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))",
+              }}
+            >
               {primaryBanner.accentIcon}
             </span>
 
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span
                   style={{
                     backgroundColor: "rgba(255, 255, 255, 0.25)",
@@ -76,7 +94,14 @@ export const LoveBanner: React.FC = () => {
                 </span>
               </div>
 
-              <h3 style={{ margin: "4px 0 0 0", fontSize: "17px", fontWeight: 700, fontFamily: "'RobotoSlab', serif" }}>
+              <h3
+                style={{
+                  margin: "4px 0 0 0",
+                  fontSize: "17px",
+                  fontWeight: 700,
+                  fontFamily: "'RobotoSlab', serif",
+                }}
+              >
                 {primaryBanner.anniversary.title}
               </h3>
             </div>
@@ -86,7 +111,13 @@ export const LoveBanner: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ textAlign: "right" }}>
               {primaryBanner.diffDays === 0 ? (
-                <span style={{ fontSize: "14px", fontWeight: 800, textTransform: "uppercase" }}>
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                  }}
+                >
                   🎉 Hôm Nay!
                 </span>
               ) : primaryBanner.diffDays < 0 ? (
@@ -118,7 +149,11 @@ export const LoveBanner: React.FC = () => {
                 }}
               >
                 <span>+{allActiveBanners.length - 1} sự kiện</span>
-                {showAllAnniversaries ? <IoChevronUpOutline /> : <IoChevronDownOutline />}
+                {showAllAnniversaries ? (
+                  <IoChevronUpOutline />
+                ) : (
+                  <IoChevronDownOutline />
+                )}
               </button>
             )}
           </div>
@@ -136,7 +171,14 @@ export const LoveBanner: React.FC = () => {
               gap: "8px",
             }}
           >
-            <div style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 700, opacity: 0.9 }}>
+            <div
+              style={{
+                fontSize: "11px",
+                textTransform: "uppercase",
+                fontWeight: 700,
+                opacity: 0.9,
+              }}
+            >
               Các sự kiện kỷ niệm sắp diễn ra khác:
             </div>
             {allActiveBanners.slice(1).map((b) => (
@@ -152,9 +194,14 @@ export const LoveBanner: React.FC = () => {
                   fontSize: "12px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
                   <span>{b.anniversary.icon}</span>
-                  <span><strong>{b.anniversary.title}</strong> ({b.anniversary.month}/{b.anniversary.day})</span>
+                  <span>
+                    <strong>{b.anniversary.title}</strong> (
+                    {b.anniversary.month}/{b.anniversary.day})
+                  </span>
                 </div>
                 <span>{b.badgeLabel}</span>
               </div>

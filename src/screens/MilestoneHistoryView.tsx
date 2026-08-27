@@ -250,7 +250,7 @@ export const MilestoneHistoryView: React.FC<MilestoneHistoryViewProps> = ({
           gap: "10px",
           overflowX: "auto",
           paddingTop: "8px",
-          paddingBottom: "18px",
+          paddingBottom: "24px",
           marginTop: "-4px",
           marginBottom: "12px",
           width: "100%",

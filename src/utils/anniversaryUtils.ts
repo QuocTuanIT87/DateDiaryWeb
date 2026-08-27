@@ -20,7 +20,7 @@ export interface AnniversaryItem {
   note?: string;
 }
 
-export type BannerWindowLevel = 
+export type BannerWindowLevel =
   | "one_month"      // 22-30 days before
   | "three_weeks"    // 15-21 days before
   | "two_weeks"      // 8-14 days before

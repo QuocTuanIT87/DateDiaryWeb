@@ -1,5 +1,4 @@
 import React from "react";
-import { getLoveDays, getMilestoneTheme } from "../utils/milestoneUtils";
 import { IoTrophyOutline } from "react-icons/io5";
 
 interface MilestoneProfileSectionProps {
@@ -9,19 +8,7 @@ interface MilestoneProfileSectionProps {
 
 export const MilestoneProfileSection: React.FC<
   MilestoneProfileSectionProps
-> = ({ acquaintedDateIso, onViewMilestones }) => {
-  const loveDays = getLoveDays(acquaintedDateIso);
-  const milestoneTheme = getMilestoneTheme(loveDays);
-
-  const milestoneIndex = Math.floor(loveDays / 100);
-  const currentMilestoneStartDays = milestoneIndex * 100;
-  const daysInCurrentMilestone = loveDays - currentMilestoneStartDays;
-  const progressPercent = Math.min(
-    100,
-    Math.max(0, Math.round((daysInCurrentMilestone / 100) * 100)),
-  );
-  const daysToNextMilestone = (milestoneIndex + 1) * 100 - loveDays;
-
+> = ({ onViewMilestones }) => {
   return (
     <div style={{ marginTop: "32px", width: "100%" }}>
       {/* Section Header */}
