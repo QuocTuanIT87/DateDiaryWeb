@@ -9,6 +9,7 @@ import { GoogleDriveService } from "../services/GoogleDriveService";
 import { formatDateTime } from "../utils/dateUtils";
 import { LazyImage } from "../components/LazyImage";
 import { CustomAlert } from "../components/CustomAlert";
+import { LoveBanner } from "../components/LoveBanner";
 import {
   IoEllipsisHorizontalOutline,
   IoChatboxEllipsesOutline,
@@ -617,6 +618,9 @@ export const AddEventView: React.FC = () => {
           flex: 1,
         }}
       >
+        {/* Anniversary Reminder Banner */}
+        <LoveBanner />
+
         {/* Main Title Header */}
         <div
           style={{
